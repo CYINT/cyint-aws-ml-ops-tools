@@ -26,7 +26,7 @@ From here, you can set pre-commit hooks to ensure proper commit formatting:
 
 Delete the `dist` folder if it already exists.
 Don't forget to increment the version number in `setup.py `prior to building.
-`python3 setup.py bdist_wheel` to create the `dist` folder containing the package build.
+`poetry build` to create the `dist` folder containing the package build.
 
 ## Deploy to pypi
 

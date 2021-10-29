@@ -2,9 +2,9 @@ import sys
 
 import pytest
 
-sys.path.insert(0, "../../src")
+sys.path.insert(0, "../../cyint_aws_ml_ops_tools")
 
-from src.glue.jobs import define_job
+from cyint_aws_ml_ops_tools.glue.jobs import define_job
 
 
 def test_jobs(mocker):

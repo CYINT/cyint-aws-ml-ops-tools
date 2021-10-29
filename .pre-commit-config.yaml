@@ -51,7 +51,7 @@ repos:
     hooks:
     -   id: pytest
         name: pytest
-        entry: pytest --cov-report term --cov-report xml --cov src
+        entry: pytest --cov-report term --cov-report xml --cov cyint_aws_ml_ops_tools
         language: python
         pass_filenames: false
         always_run: true

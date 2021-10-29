@@ -2,7 +2,7 @@
 show_missing = true
 sort = cover
 exclude_lines = if __name__
-include = src/*
+include = cyint_aws_ml_ops_tools/*
 omit = tests/*
 
 [xml]

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cyint-aws-ml-ops-tools"
-version = "1.0.0"
+version = "1.0.1"
 description = "Tools for assisting with managing modern ml-ops-pipelines in AWS Sagemaker"
 authors = ["Daniel Fredriksen <dfredriksen@cyint.technology>"]
 license = "MIT"
