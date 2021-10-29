@@ -49,14 +49,14 @@ def define_job(
     glueclient = boto3.client(
         "glue",
         aws_access_key_id=aws_access_key_id,
-        aws_secret_key=aws_secret_key_id,
+        aws_secret_access_key=aws_secret_key_id,
         region_name=region_name,
     )
 
     s3client = boto3.client(
         "s3",
         aws_access_key_id=aws_access_key_id,
-        aws_secret_key=aws_secret_key_id,
+        aws_secret_access_key=aws_secret_key_id,
         region_name=region_name,
     )
 
