@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "cyint-aws-ml-ops-tools"
+version = "1.0.0"
+description = "Tools for assisting with managing modern ml-ops-pipelines in AWS Sagemaker"
+authors = ["Daniel Fredriksen <dfredriksen@cyint.technology>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "3.9"
+
+[tool.poetry.dev-dependencies]
+wheel = "^0.37.0"
+pre-commit = "^2.15.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

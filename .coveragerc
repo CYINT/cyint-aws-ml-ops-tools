@@ -1,0 +1,7 @@
+[report]
+show_missing = true
+sort = cover
+exclude_lines = if __name__
+
+[xml]
+output = coverage.xml
