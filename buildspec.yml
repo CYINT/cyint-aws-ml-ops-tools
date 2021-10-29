@@ -1,0 +1,41 @@
+version: 0.2
+
+env:
+  secrets-manager:
+    CODECOV_TOKEN: cyintAWSMLOpsToolsCodeCov
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo Entering install phase...
+      - python3 -m venv /root/venv
+      - . /root/venv/bin/activate
+      - pip3 install pytest && pip3 install poetry
+      - poetry install
+      - poetry shell
+  pre_build:
+    commands:
+      - echo Nothing to do in the pre_build phase...
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Running pre-commit hooks
+      - pre-commit run --all-files
+      - echo Running tests...
+      - python -m pytest --cov-report term --cov-report xml
+      - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+  post_build:
+    commands:
+      - echo Build completed on `date`
+cache:
+  paths:
+    - '/root/venv/**/*'
+    - '/root/.cache/pip/**/*'
+    - '/root/.cache/pypoetry/virtualenvs/**/*'
+reports:
+  pytest_reports:
+    files:
+      - coverage.xml
+    file-format: COBERTURAXML

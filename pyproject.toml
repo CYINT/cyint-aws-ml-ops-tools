@@ -7,11 +7,22 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "3.9"
+boto3 = "^1.19.6"
 
 [tool.poetry.dev-dependencies]
 wheel = "^0.37.0"
 pre-commit = "^2.15.0"
+pytest = "^6.2.5"
+pytest-cov = "^3.0.0"
+pytest-mock = "^3.6.1"
+setuptools = "^58.3.0"
+twine = "^3.4.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests"
+]

@@ -2,6 +2,8 @@
 
 A python package that wraps some useful functions to be used in the modern ML Ops pipelines.
 
+[![codecov](https://codecov.io/gh/CYINT/cyint-aws-ml-ops-tools/branch/main/graph/badge.svg?token=2VLUo3hBph)](https://codecov.io/gh/CYINT/cyint-aws-ml-ops-tools)
+
 ## Dependencies
 
 Setup a virtual environment, then install `poetry` using `pip`
@@ -24,7 +26,7 @@ From here, you can set pre-commit hooks to ensure proper commit formatting:
 
 Delete the `dist` folder if it already exists.
 Don't forget to increment the version number in `setup.py `prior to building.
-`python3 .\setup.py bdist_wheel` to create the `dist` folder containing the package build.
+`python3 setup.py bdist_wheel` to create the `dist` folder containing the package build.
 
 ## Deploy to pypi
 
@@ -32,7 +34,7 @@ Increment the version number `setup.py`.
 
 Tag the release.
 
-run `python3 -m twine upload .\dist\*` to upload to pypi. Currently this package is deployed to the `cyint` pypi account.
+run `python3 -m twine upload ./dist/*` to upload to pypi. Currently this package is deployed to the `cyint` pypi account.
 
 You might run into the following error:
 

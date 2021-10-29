@@ -51,10 +51,11 @@ repos:
     hooks:
     -   id: pytest
         name: pytest
-        entry: pytest
+        entry: pytest --cov-report term --cov-report xml --cov src
         language: python
         pass_filenames: false
         always_run: true
+        verbose: true
 -   repo: https://github.com/jorisroovers/gitlint
     rev: v0.10.0
     hooks:
