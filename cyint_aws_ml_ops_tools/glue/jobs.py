@@ -115,6 +115,9 @@ def handle_job(
         )
 
     job_configuration["Command"] = command_object
+    job_configuration["Role"] = (
+        role_arn if "Role" not in job_configuration else job_configuration["Role"]
+    )
 
     response = glueclient.update_job(JobName=name, JobUpdate=job_configuration)
 
