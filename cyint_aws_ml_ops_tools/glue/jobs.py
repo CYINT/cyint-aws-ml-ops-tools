@@ -60,11 +60,15 @@ def define_job(
         region_name=region_name,
     )
 
+    job_name = f"{environment_prefix_name}{name}"
+    trigger_environment_name = f"{environment_prefix_name}{trigger_name}"
+    glue_script_bucket_name = f"{environment_prefix_name}{glue_script_bucket_name}"
+
     new_job = is_new_job(glueclient, name)
     response_job = handle_job(
         glueclient,
         new_job,
-        name,
+        job_name,
         command,
         destination_key,
         role_arn,
@@ -76,10 +80,9 @@ def define_job(
         file_location,
         destination_key,
         glue_script_bucket_name,
-        environment_prefix_name,
     )
     response_trigger = handle_trigger(
-        glueclient, name, trigger_name, trigger_type, trigger_definition
+        glueclient, name, trigger_environment_name, trigger_type, trigger_definition
     )
     return {"job": response_job, "script": response_script, "trigger": response_trigger}
 
@@ -113,21 +116,17 @@ def handle_job(
     return response
 
 
-def handle_script_upload(
-    s3client, file_location, destination_key, glue_script_bucket, environment_prefix=""
-):
+def handle_script_upload(s3client, file_location, destination_key, glue_script_bucket):
     """
     Uploads the Glue Job script to the S3 bucket, and creates the necessary environment bucket if it doesn't exist.
     """
 
-    bucket_name = f"{environment_prefix}{glue_script_bucket}"
-
     try:
-        s3client.create_bucket(Bucket=bucket_name)
+        s3client.create_bucket(Bucket=glue_script_bucket)
     except ClientError as e:
         pass
 
-    response = s3client.upload_file(file_location, bucket_name, destination_key)
+    response = s3client.upload_file(file_location, glue_script_bucket, destination_key)
 
     return response
 
