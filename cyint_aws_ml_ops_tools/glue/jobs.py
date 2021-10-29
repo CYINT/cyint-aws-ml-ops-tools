@@ -11,8 +11,8 @@ def define_job(
     destination_key,
     trigger_name,
     trigger_type,
-    trigger_definition,
-    job_configuration,
+    trigger_definition={},
+    job_configuration={},
     python_version="3",
     aws_access_key=None,
     aws_secret_key=None,
@@ -95,21 +95,26 @@ def handle_job(
     destination_key,
     role_arn,
     python_version,
-    job_configuration,
+    job_configuration={},
 ):
     """
     Sets up the job in AWS Glue or updates it if it already exists.
     """
+
+    command_object = {
+        "Name": command,
+        "ScriptLocation": destination_key,
+        "PythonVersion": python_version,
+    }
+
     if new_job:
         response = glueclient.create_job(
             Name=name,
             Role=role_arn,
-            Command={
-                "Name": command,
-                "ScriptLocation": destination_key,
-                "PythonVersion": python_version,
-            },
+            Command=command_object,
         )
+
+    job_configuration["Command"] = command_object
 
     response = glueclient.update_job(JobName=name, JobUpdate=job_configuration)
 
