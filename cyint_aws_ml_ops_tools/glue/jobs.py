@@ -153,7 +153,7 @@ def handle_trigger(
 
     if new_trigger:
         response = glueclient.create_trigger(
-            Name=trigger_name, Type=trigger_type, Actions={"JobName": job_name}
+            Name=trigger_name, Type=trigger_type, Actions=[{"JobName": job_name}]
         )
 
     response = glueclient.update_trigger(
