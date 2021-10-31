@@ -152,11 +152,9 @@ def handle_trigger(
     new_trigger = is_new_trigger(glueclient, trigger_name)
 
     schedule = None if trigger_type != "SCHEDULED" else trigger_definition["Schedule"]
-    predicate = (
-        None if trigger_type != "CONDITIONAL" else trigger_definition["Predicate"]
-    )
+    predicate = {} if trigger_type != "CONDITIONAL" else trigger_definition["Predicate"]
     event_batching = (
-        None
+        {"BatchSize": 1}
         if trigger_type != "EVENT"
         else trigger_definition["EventBatchingCondition"]
     )
