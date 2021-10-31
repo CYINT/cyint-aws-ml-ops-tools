@@ -151,9 +151,24 @@ def handle_trigger(
     """
     new_trigger = is_new_trigger(glueclient, trigger_name)
 
+    schedule = None if trigger_type != "SCHEDULED" else trigger_definition["Schedule"]
+    predicate = (
+        None if trigger_type != "CONDITIONAL" else trigger_definition["Predicate"]
+    )
+    event_batching = (
+        None
+        if trigger_type != "EVENT"
+        else trigger_definition["EventBatchingCondition"]
+    )
+
     if new_trigger:
         response = glueclient.create_trigger(
-            Name=trigger_name, Type=trigger_type, Actions=[{"JobName": job_name}]
+            Name=trigger_name,
+            Type=trigger_type,
+            Actions=[{"JobName": job_name}],
+            Schedule=schedule,
+            Predicate=predicate,
+            EventBatchingCondition=event_batching,
         )
 
     response = glueclient.update_trigger(
