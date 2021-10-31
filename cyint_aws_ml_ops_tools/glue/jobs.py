@@ -159,6 +159,13 @@ def handle_trigger(
         else trigger_definition["EventBatchingCondition"]
     )
 
+    actions = (
+        [{"JobName": job_name}]
+        if "Actions" not in trigger_definition
+        else trigger_definition["Actions"]
+    )
+    trigger_definition["Actions"] = actions
+
     if new_trigger:
         response = glueclient.create_trigger(
             Name=trigger_name,
