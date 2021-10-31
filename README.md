@@ -25,7 +25,7 @@ From here, you can set pre-commit hooks to ensure proper commit formatting:
 ## Build
 
 Delete the `dist` folder if it already exists.
-Don't forget to increment the version number in `setup.py `prior to building.
+Don't forget to increment the version number in `pyproject.toml` prior to building.
 `poetry build` to create the `dist` folder containing the package build.
 
 ## Deploy to pypi

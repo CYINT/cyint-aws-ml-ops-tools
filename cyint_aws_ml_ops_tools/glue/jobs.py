@@ -64,7 +64,7 @@ def define_job(
     trigger_environment_name = f"{environment_prefix_name}{trigger_name}"
     glue_script_bucket_name = f"{environment_prefix_name}{glue_script_bucket_name}"
 
-    new_job = is_new_job(glueclient, name)
+    new_job = is_new_job(glueclient, job_name)
     response_job = handle_job(
         glueclient,
         new_job,
@@ -82,7 +82,7 @@ def define_job(
         glue_script_bucket_name,
     )
     response_trigger = handle_trigger(
-        glueclient, name, trigger_environment_name, trigger_type, trigger_definition
+        glueclient, job_name, trigger_environment_name, trigger_type, trigger_definition
     )
     return {"job": response_job, "script": response_script, "trigger": response_trigger}
 
