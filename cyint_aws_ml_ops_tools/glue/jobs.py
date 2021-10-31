@@ -129,12 +129,16 @@ def handle_script_upload(s3client, file_location, destination_key, glue_script_b
     Uploads the Glue Job script to the S3 bucket, and creates the necessary environment bucket if it doesn't exist.
     """
 
+    glue_script_bucket_sanitized = glue_script_bucket.replace("_", "-")
+
     try:
-        s3client.create_bucket(Bucket=glue_script_bucket)
+        s3client.create_bucket(Bucket=glue_script_bucket_sanitized)
     except ClientError as e:
         pass
 
-    response = s3client.upload_file(file_location, glue_script_bucket, destination_key)
+    response = s3client.upload_file(
+        file_location, glue_script_bucket_sanitized, destination_key
+    )
 
     return response
 
