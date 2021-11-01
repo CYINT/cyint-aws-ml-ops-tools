@@ -212,7 +212,7 @@ def load_feature_group(
         if environment_prefix is None
         else environment_prefix
     )
-
+    feature_group_name = name.replace("_", "-")
     region_name = boto3.Session().region_name if region is None else region
     boto_session = boto3.Session(
         aws_access_key_id=aws_access_key_id,
@@ -235,5 +235,5 @@ def load_feature_group(
     )
 
     return FeatureGroup(
-        name=f"{environment_prefix_name}{name}", sagemaker_session=feature_store_session
+        name=f"{feature_group_name}", sagemaker_session=feature_store_session
     )
