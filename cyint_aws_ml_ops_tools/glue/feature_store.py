@@ -32,14 +32,29 @@ def define_feature_group(
     aws_secret_key_id = (
         os.environ["AWS_SECRET_KEY"] if aws_secret_key is None else aws_secret_key
     )
-    region_name = os.environ["AWS_REGION"] if region is None else region
-    role_arn = os.environ["SAGEMAKER_ROLE"] if role is None else role
 
     environment_prefix_name = (
         os.environ["ENVIRONMENT_PREFIX"]
         if environment_prefix is None
         else environment_prefix
     )
+
+    data_lake_bucket_name = (
+        os.environ["DATA_LAKE_BUCKET"] if data_lake_bucket is None else data_lake_bucket
+    )
+    data_lake_bucket_name = f"{environment_prefix}{data_lake_bucket_name}"
+    data_lake_bucket_name = data_lake_bucket_name.replace("_", "-")
+
+    region_name = os.environ["AWS_REGION"] if region is None else region
+    role_arn = os.environ["SAGEMAKER_ROLE"] if role is None else role
+
+    offline_store_config_object = (
+        {} if offline_store_config is None else offline_store_config
+    )
+    if s3_key is not None:
+        offline_store_config_object["OfflineStoreConfig"] = {
+            "S3StorageConfig": {"S3Uri": f"s3://{data_lake_bucket_name}/{s3_key}"}
+        }
 
     sagemakerclient = boto3.client(
         "sagemaker",
