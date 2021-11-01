@@ -188,15 +188,44 @@ def is_feature_group_different(
     )
 
 
-def load_feature_group(feature_group_name):
+def load_feature_group(
+    name,
+    aws_access_key=None,
+    aws_secret_key=None,
+    region=None,
+    environment_prefix=None,
+):
+    """
+    Loads a feature group object from the feature store by name
+    """
+    environment_prefix_name = environment_prefix
 
-    region = boto3.Session().region_name
-    boto_session = boto3.Session(region_name=region)
+    aws_access_key_id = (
+        os.environ["AWS_ACCESS_KEY"] if aws_access_key is None else aws_access_key
+    )
+    aws_secret_key_id = (
+        os.environ["AWS_SECRET_KEY"] if aws_secret_key is None else aws_secret_key
+    )
 
-    sagemaker_client = boto_session.client(service_name="sagemaker", region_name=region)
+    environment_prefix_name = (
+        os.environ["ENVIRONMENT_PREFIX"]
+        if environment_prefix is None
+        else environment_prefix
+    )
+
+    region_name = boto3.Session().region_name if region is None else region
+    boto_session = boto3.Session(
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_access_key_id,
+        region_name=region_name,
+    )
+
+    sagemaker_client = boto_session.client(
+        service_name="sagemaker", region_name=region_name
+    )
 
     featurestore_runtime = boto_session.client(
-        service_name="sagemaker-featurestore-runtime", region_name=region
+        service_name="sagemaker-featurestore-runtime", region_name=region_name
     )
 
     feature_store_session = Session(
@@ -206,5 +235,5 @@ def load_feature_group(feature_group_name):
     )
 
     return FeatureGroup(
-        name=feature_group_name, sagemaker_session=feature_store_session
+        name=f"{environment_prefix_name}{name}", sagemaker_session=feature_store_session
     )
