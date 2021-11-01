@@ -1,4 +1,5 @@
 import os
+from time import sleep
 
 import boto3
 from botocore.exceptions import ClientError
@@ -10,7 +11,7 @@ def define_feature_group(
     record_identifier_feature,
     event_time_feature,
     feature_definitions,
-    online_store_config={},
+    online_store_config={"EnableOnlineStore": True},
     offline_store_config={},
     s3_key=None,
     aws_access_key=None,
@@ -91,6 +92,7 @@ def define_feature_group(
 
     if is_different:
         sagemakerclient.delete_feature_group(FeatureGroupName=feature_group_name)
+        sleep(10)
 
     response = {"Message": "Feature group already exists with the provided definition."}
 
@@ -131,7 +133,7 @@ def is_feature_group_different(
     event_time_feature,
     feature_definitions,
     online_store_config,
-    offline_store_config,
+    offline_store,
     role_arn,
     description,
 ):
@@ -140,11 +142,43 @@ def is_feature_group_different(
         FeatureGroupName=feature_group_name
     )
 
+    offline_store_config = offline_store
+
+    if (
+        "S3StorageConfig" in response["OfflineStoreConfig"]
+        and "S3StorageConfig" in offline_store_config
+    ):
+        if (
+            "ResolvedOutputS3Uri" not in offline_store_config
+            or offline_store_config["S3StorageConfig"]["ResolvedOutputS3Uri"]
+            == response["OfflineStoreConfig"]["S3StorageConfig"]["ResolvedOutputS3Uri"]
+        ):
+            offline_store_config["S3StorageConfig"]["ResolvedOutputS3Uri"] = response[
+                "OfflineStoreConfig"
+            ]["S3StorageConfig"]["ResolvedOutputS3Uri"]
+
+    if (
+        "DisableGlueTableCreation" not in offline_store_config
+        or offline_store_config["DisableGlueTableCreation"]
+        == response["OfflineStoreConfig"]["DisableGlueTableCreation"]
+    ):
+        offline_store_config["DisableGlueTableCreation"] = response[
+            "OfflineStoreConfig"
+        ]["DisableGlueTableCreation"]
+
+    if (
+        "DataCatalogConfig" not in offline_store_config
+        or offline_store_config["DataCatalogConfig"]
+        == response["OfflineStoreConfig"]["DataCatalogConfig"]
+    ):
+        offline_store_config["DataCatalogConfig"] = response["OfflineStoreConfig"][
+            "DataCatalogConfig"
+        ]
+
     return (
         response["RoleArn"] != role_arn
         or response["RecordIdentifierFeatureName"] != record_identifier_feature
         or response["EventTimeFeatureName"] != event_time_feature
-        or response["FeatureDefinitions"] != feature_definitions
         or response["FeatureDefinitions"] != feature_definitions
         or response["OnlineStoreConfig"] != online_store_config
         or response["OfflineStoreConfig"] != offline_store_config
