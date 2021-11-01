@@ -52,7 +52,7 @@ def define_feature_group(
         {} if offline_store_config is None else offline_store_config
     )
     if s3_key is not None:
-        offline_store_config_object["OfflineStoreConfig"] = {
+        offline_store_config_object = {
             "S3StorageConfig": {"S3Uri": f"s3://{data_lake_bucket_name}/{s3_key}"}
         }
 
@@ -93,7 +93,7 @@ def define_feature_group(
             EventTimeFeatureName=event_time_feature,
             FeatureDefinitions=feature_definitions,
             OnlineStoreConfig=online_store_config,
-            OfflineStoreConfig=offline_store_config,
+            OfflineStoreConfig=offline_store_config_object,
             RoleArn=role_arn,
             Description=description,
         )
@@ -134,6 +134,6 @@ def is_feature_group_different(
         or response["FeatureDefinitions"] != feature_definitions
         or response["FeatureDefinitions"] != feature_definitions
         or response["OnlineStoreConfig"] != online_store_config
-        or response["OfflineStoreCOnfig"] != offline_store_config
+        or response["OfflineStoreConfig"] != offline_store_config
         or response["Description"] != description
     )
