@@ -76,7 +76,7 @@ def define_feature_group(
             event_time_feature,
             feature_definitions,
             online_store_config,
-            offline_store_config,
+            offline_store_config_object,
             role_arn,
             description,
         )
