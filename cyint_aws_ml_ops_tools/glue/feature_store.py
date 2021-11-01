@@ -51,6 +51,7 @@ def define_feature_group(
     offline_store_config_object = (
         {} if offline_store_config is None else offline_store_config
     )
+
     if s3_key is not None:
         offline_store_config_object = {
             "S3StorageConfig": {"S3Uri": f"s3://{data_lake_bucket_name}/{s3_key}"}
@@ -58,6 +59,13 @@ def define_feature_group(
 
     sagemakerclient = boto3.client(
         "sagemaker",
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_key_id,
+        region_name=region_name,
+    )
+
+    s3client = boto3.client(
+        "s3",
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_key_id,
         region_name=region_name,
@@ -85,6 +93,11 @@ def define_feature_group(
         sagemakerclient.delete_feature_group(FeatureGroupName=feature_group_name)
 
     response = {"Message": "Feature group already exists with the provided definition."}
+
+    try:
+        s3client.create_bucket(Bucket=data_lake_bucket_name)
+    except ClientError as e:
+        pass
 
     if is_different or is_new:
         response = sagemakerclient.create_feature_group(
