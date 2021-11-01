@@ -53,8 +53,8 @@ def define_feature_group(
     )
 
     if s3_key is not None:
-        offline_store_config_object = {
-            "S3StorageConfig": {"S3Uri": f"s3://{data_lake_bucket_name}/{s3_key}"}
+        offline_store_config_object["S3StorageConfig"] = {
+            "S3Uri": f"s3://{data_lake_bucket_name}/{s3_key}"
         }
 
     sagemakerclient = boto3.client(
