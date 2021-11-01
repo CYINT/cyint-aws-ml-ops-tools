@@ -69,16 +69,19 @@ def define_feature_group(
     if is_different:
         sagemakerclient.delete_feature_group(FeatureGroupName=feature_group_name)
 
-    response = sagemakerclient.create_feature_group(
-        FeatureGroupName=feature_group_name,
-        RecordIdentifierFeatureName=record_identifier_feature,
-        EventTimeFeatureName=event_time_feature,
-        FeatureDefinitions=feature_definitions,
-        OnlineStoreConfig=online_store_config,
-        OfflineStoreConfig=offline_store_config,
-        RoleArn=role_arn,
-        Description=description,
-    )
+    response = {"Message": "Feature group already exists with the provided definition."}
+
+    if is_different or is_new:
+        response = sagemakerclient.create_feature_group(
+            FeatureGroupName=feature_group_name,
+            RecordIdentifierFeatureName=record_identifier_feature,
+            EventTimeFeatureName=event_time_feature,
+            FeatureDefinitions=feature_definitions,
+            OnlineStoreConfig=online_store_config,
+            OfflineStoreConfig=offline_store_config,
+            RoleArn=role_arn,
+            Description=description,
+        )
 
     return {"feature_group": response}
 
