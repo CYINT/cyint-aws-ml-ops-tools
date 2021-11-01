@@ -42,7 +42,7 @@ def define_feature_group(
     data_lake_bucket_name = (
         os.environ["DATA_LAKE_BUCKET"] if data_lake_bucket is None else data_lake_bucket
     )
-    data_lake_bucket_name = f"{environment_prefix}{data_lake_bucket_name}"
+    data_lake_bucket_name = f"{environment_prefix_name}{data_lake_bucket_name}"
     data_lake_bucket_name = data_lake_bucket_name.replace("_", "-")
 
     region_name = os.environ["AWS_REGION"] if region is None else region
