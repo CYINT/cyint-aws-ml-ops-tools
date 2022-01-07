@@ -2,7 +2,7 @@ version: 0.2
 
 env:
   secrets-manager:
-    CODECOV_TOKEN: cyintAWSMLOpsToolsCodeCov
+    ENVIRONMENT_CONFIG: "overridden_by_pull_request_lambda" #See ml-aws-pipeline-builder for overriden values
 
 phases:
   install:
@@ -14,7 +14,8 @@ phases:
       - . /root/venv/bin/activate
       - pip3 install pytest && pip3 install poetry
       - poetry install
-      - poetry shell
+      - echo $ENVIRONMENT_CONFIG > .env
+      - export  $(cat .env | xargs)
   pre_build:
     commands:
       - echo Nothing to do in the pre_build phase...
@@ -23,9 +24,9 @@ phases:
       - echo Build started on `date`
       - echo Running pre-commit hooks
       - pre-commit run --all-files
+      - runipy pipeline.ipynb
       - echo Running tests...
-      - python -m pytest --cov-report term --cov-report xml
-      - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+      - python -m pytest --cov-report term --cov-report xml --cov=jobscripts
   post_build:
     commands:
       - echo Build completed on `date`

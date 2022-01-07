@@ -30,7 +30,7 @@ Don't forget to increment the version number in `pyproject.toml` prior to buildi
 
 ## Deploy to pypi
 
-Increment the version number `setup.py`.
+Increment the version number `pyproject.toml`.
 
 Tag the release.
 
