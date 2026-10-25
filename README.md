@@ -158,3 +158,7 @@ UTF-16 supplementary-character range translated to Python Unicode scalars. Known
 collection rules preserve valid InMemory List/Set and Fractional Vector definitions
 while rejecting unsupported tiers, invalid vector type/config/dimensions and multiple
 vectors. Iceberg event time must be String and Glue table creation must remain enabled.
+
+A missing or empty hyperparameter grid creates one static-only parameter combination
+per dataset. Static parameters, experiment/trial/component metadata and the training
+callback are preserved; a nonempty grid still produces its Cartesian combinations.

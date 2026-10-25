@@ -188,7 +188,8 @@ def test_bucket_errors_do_not_hide_other_owner_or_denied_access(code, accepted):
         stub.assert_no_pending_responses()
 
 
-def test_define_experiment_preserves_whole_training_path_without_live_calls(client, mocker):
+@pytest.mark.parametrize("grid", [{}, {"rate": [0.1]}])
+def test_define_experiment_preserves_whole_training_path_without_live_calls(client, mocker, grid):
     s3 = boto3.client("s3", region_name="us-east-1")
     mocker.patch.object(experiment.boto3, "Session", return_value=SimpleNamespace(
         client=lambda service: {"sagemaker": client, "s3": s3}[service],
@@ -204,17 +205,18 @@ def test_define_experiment_preserves_whole_training_path_without_live_calls(clie
         storage.add_response("create_bucket", {}, {"Bucket": "qualification-bucket"})
         sm.add_response("create_experiment", {}, {"ExperimentName": "qualification-model-run", "Description": "hypothesis"})
         start(sm, component1, display="qualification-model-run")
-        end(sm, component1, {"epochs": {"NumberValue": 2.0}, "rate": {"StringValue": "[0.1]"}})
+        end(sm, component1, {"epochs": {"NumberValue": 2.0}, **({"rate": {"StringValue": "[0.1]"}} if grid else {})})
         start(sm, component2, display="trial-metadata-1700000000")
-        end(sm, component2, {"epochs": {"NumberValue": 2.0}, "rate": {"NumberValue": 0.1}})
+        end(sm, component2, {"epochs": {"NumberValue": 2.0}, **({"rate": {"NumberValue": 0.1}} if grid else {})})
         sm.add_response("create_trial", {}, {"TrialName": trial, "ExperimentName": "qualification-model-run"})
         sm.add_response("associate_trial_component", {}, {"TrialName": trial, "TrialComponentName": component1})
         sm.add_response("associate_trial_component", {}, {"TrialName": trial, "TrialComponentName": component2})
         run = experiment.define_experiment(
             "model", "hypothesis", callback, metrics=[], static_hyperparams={"epochs": 2},
-            hyperparam_configuration={"rate": [0.1]}, dataset=[{"row": 1}], run="run",
+            dataset=[{"row": 1}], run="run",
             aws_access_key="testing", aws_secret_key="testing", region="us-east-1",
             role="qualification-role", environment_prefix="qualification", experiment_bucket="bucket", trial_wait_time=0,
+            **({"hyperparam_configuration": grid} if grid else {}),
         )
         assert run == "run"
         assert callback.call_count == 1

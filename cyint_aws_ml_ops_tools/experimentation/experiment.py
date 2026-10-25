@@ -236,7 +236,9 @@ def detect_experiment_winner(
 
 
 def define_hyperparameter_set(hyperparam_configuration):
-    hypnames, hypvalues = zip(*hyperparam_configuration.items())
+    # The Cartesian product of an empty grid is one static-only trial.
+    hypnames = tuple(hyperparam_configuration)
+    hypvalues = tuple(hyperparam_configuration.values())
     trial_hyperparameter_set = [
         dict(zip(hypnames, h)) for h in itertools.product(*hypvalues)
     ]
