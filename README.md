@@ -146,3 +146,15 @@ script bucket; cross-bucket URIs are rejected before any write. Raw keys are ret
 for upload and encoded for the canonical script URI. S3 URI paths are decoded once;
 queries, fragments and invalid encodings are rejected rather than silently remapped.
 Direct handle_job callers continue to supply their intended existing script location.
+
+
+Existing feature groups must be confirmed Created before ordinary reconciliation.
+Creating, deleting, failed or unknown lifecycle states require separate recovery or
+completion handling; allow_recreate does not bypass that readiness gate. New create
+responses remain asynchronous provider acknowledgements, not readiness/recovery proof.
+Shared request validation enforces declared min/max, numeric ranges/finite values,
+UTF-8, enums and patterns for Glue and feature requests, including the AWS Glue
+UTF-16 supplementary-character range translated to Python Unicode scalars. Known
+collection rules preserve valid InMemory List/Set and Fractional Vector definitions
+while rejecting unsupported tiers, invalid vector type/config/dimensions and multiple
+vectors. Iceberg event time must be String and Glue table creation must remain enabled.

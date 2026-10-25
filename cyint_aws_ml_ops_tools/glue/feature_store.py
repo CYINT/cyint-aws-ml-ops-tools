@@ -1,5 +1,4 @@
 import os
-import re
 from copy import deepcopy
 from functools import lru_cache
 from time import sleep
@@ -7,11 +6,10 @@ from time import sleep
 import boto3
 from botocore.exceptions import ClientError
 from botocore.session import get_session
-from botocore.validate import validate_parameters
 from sagemaker.feature_store.feature_group import FeatureGroup
 from sagemaker.session import Session
 
-from cyint_aws_ml_ops_tools.universal.pipeline import create_s3bucket_if_not_exist, resolve_aws_credentials
+from cyint_aws_ml_ops_tools.universal.pipeline import create_s3bucket_if_not_exist, resolve_aws_credentials, validate_request_model
 
 
 def define_feature_group(
@@ -118,6 +116,7 @@ def is_feature_group_new(sagemakerclient, feature_group_name):
         response = sagemakerclient.describe_feature_group(
             FeatureGroupName=feature_group_name
         )
+        require_feature_group_ready(response)
         return False
     except ClientError as e:
         if e.response.get("Error", {}).get("Code") in {"ResourceNotFound", "ResourceNotFoundException"}:
@@ -129,25 +128,6 @@ def is_feature_group_new(sagemakerclient, feature_group_name):
 def feature_group_create_shape():
     return get_session().get_service_model("sagemaker").operation_model("CreateFeatureGroup").input_shape
 
-
-def validate_model_constraints(shape, value):
-    """Check enums/patterns that botocore's structural validator does not check."""
-    if shape.type_name == "structure":
-        for key, item in value.items():
-            validate_model_constraints(shape.members[key], item)
-    elif shape.type_name == "list":
-        for item in value:
-            validate_model_constraints(shape.member, item)
-    elif shape.type_name == "map":
-        for key, item in value.items():
-            validate_model_constraints(shape.key, key)
-            validate_model_constraints(shape.value, item)
-    elif shape.type_name == "string":
-        if shape.enum and value not in shape.enum:
-            raise ValueError("Feature-group request contains an unsupported enumerated value")
-        pattern = shape.metadata.get("pattern")
-        if pattern and re.fullmatch(pattern, value) is None:
-            raise ValueError("Feature-group request does not match its service-model string pattern")
 
 
 def prepare_feature_group_request(name, description, record_identifier, event_time, definitions,
@@ -169,8 +149,7 @@ def prepare_feature_group_request(name, description, record_identifier, event_ti
     if offline:
         request["OfflineStoreConfig"] = offline
     shape = feature_group_create_shape()
-    validate_parameters(request, shape)
-    validate_model_constraints(shape, request)
+    validate_request_model(shape, request)
     names = [definition["FeatureName"] for definition in request["FeatureDefinitions"]]
     if len(names) != len(set(names)) or any(name in {"is_deleted", "write_time", "api_invocation_time"} for name in names):
         raise ValueError("Feature names must be unique and must not use reserved names")
@@ -181,8 +160,26 @@ def prepare_feature_group_request(name, description, record_identifier, event_ti
         raise ValueError("Event-time feature must be String or Fractional")
     if not online.get("EnableOnlineStore", False) and not offline:
         raise ValueError("Enable an online or offline feature store")
-    if offline.get("TableFormat") == "Iceberg" and offline.get("DisableGlueTableCreation", False):
-        raise ValueError("Iceberg feature stores require Glue table creation")
+    if offline.get("TableFormat") == "Iceberg":
+        if offline.get("DisableGlueTableCreation", False):
+            raise ValueError("Iceberg feature stores require Glue table creation")
+        if time_definition["FeatureType"] != "String":
+            raise ValueError("Iceberg event-time features must be String")
+    collections = [definition for definition in request["FeatureDefinitions"] if definition.get("CollectionType")]
+    if collections and (not online.get("EnableOnlineStore", False) or online.get("StorageType") != "InMemory"):
+        raise ValueError("Collection features require an enabled InMemory online store")
+    vectors = 0
+    for definition in request["FeatureDefinitions"]:
+        collection_type = definition.get("CollectionType")
+        configuration = definition.get("CollectionConfig")
+        if collection_type == "Vector":
+            vectors += 1
+            if definition["FeatureType"] != "Fractional" or not configuration or "VectorConfig" not in configuration:
+                raise ValueError("Vector features require Fractional elements and a dimension configuration")
+        elif configuration:
+            raise ValueError("Vector configuration requires Vector collection type")
+    if vectors > 1:
+        raise ValueError("Only one Vector feature is supported per feature group")
     return request
 
 
@@ -209,9 +206,16 @@ def normalized_offline(config):
 
 
 
+
+def require_feature_group_ready(response):
+    if response.get("FeatureGroupStatus") != "Created":
+        raise RuntimeError("Existing feature group is not confirmed Created; reconcile lifecycle/recovery before changes")
+
+
 def describe_feature_group_complete(client, name):
     """Collect every feature-definition page before deciding a group differs."""
     response = client.describe_feature_group(FeatureGroupName=name)
+    require_feature_group_ready(response)
     result = deepcopy(response)
     definitions = deepcopy(response["FeatureDefinitions"])
     token = response.get("NextToken")

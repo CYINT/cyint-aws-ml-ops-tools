@@ -7,21 +7,9 @@ def test_jobs(mocker):
     client.meta = SimpleNamespace(region_name="us-east-1")
     client.get_trigger.return_value = {"Trigger": {"Type": "ON_DEMAND"}}
     result = define_job(
-        "test",
-        "test",
-        "test",
-        "test",
-        "test",
-        "ON_DEMAND",
-        {},
-        {},
-        "test",
-        "test",
-        "test",
-        "test",
-        "test",
-        "test",
-        "test",
+        "job", "glueetl", "script.py", "script.py", "trigger", "ON_DEMAND",
+        aws_access_key="testing", aws_secret_key="testing", region="us-east-1",
+        role="qualification", glue_script_bucket="scripts", environment_prefix="qualification-",
     )
 
     assert set(result) == {"job", "script", "trigger"}

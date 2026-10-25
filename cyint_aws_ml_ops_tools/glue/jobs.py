@@ -7,9 +7,8 @@ from functools import lru_cache
 import boto3
 from botocore.exceptions import ClientError
 from botocore.session import get_session
-from botocore.validate import validate_parameters
 
-from cyint_aws_ml_ops_tools.universal.pipeline import create_s3bucket_if_not_exist, resolve_aws_credentials
+from cyint_aws_ml_ops_tools.universal.pipeline import create_s3bucket_if_not_exist, resolve_aws_credentials, validate_request_model
 
 
 def define_job(
@@ -93,7 +92,7 @@ def glue_service_model():
 
 
 def validate_glue_request(operation, request):
-    validate_parameters(request, glue_service_model().operation_model(operation).input_shape)
+    validate_request_model(glue_service_model().operation_model(operation).input_shape, request)
 
 
 def prepare_job_requests(name, command, destination_key, role_arn, python_version, job_configuration):
