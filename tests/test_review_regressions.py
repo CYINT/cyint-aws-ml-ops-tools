@@ -141,7 +141,7 @@ def test_winner_maximizes_score_and_minimizes_error(mocker, error_metric, expect
         {"TrialComponentName": "aws-training-job-" + name, "Status": {"PrimaryStatus": "Completed"}}
         for name in ["low", "high"]
     ]}
-    details = [{"Source": {"SourceArn": name},
+    details = [{"Status": {"PrimaryStatus": "Completed"}, "Source": {"SourceArn": name},
                 "Metrics": [{"MetricName": "validation:score", "Max": value, "SourceArn": name}],
                 "OutputArtifacts": {"SageMaker.ModelArtifact": {"Value": "s3://qualification/" + name}}}
                for name, value in [("low", 0.1), ("high", 0.9)]]

@@ -101,3 +101,19 @@ without mixing credential sources. Do not put credentials in notebook or .env ou
 The offline test audit hook denies socket/DNS, subprocess and shell execution using
 PermissionError. Standard-library metadata probes can handle this denial using native
 fallbacks; no launch is permitted and no platform or SDK prewarming is required.
+
+
+Glue trigger requests omit inapplicable Schedule/Predicate/EventBatchingCondition
+fields, preserve custom actions and validate type intent before script/job mutation.
+Existing trigger types must match; changing type requires an explicit migration.
+Caller configuration dictionaries are not modified. Real Glue service-model tests
+cover new/existing ON_DEMAND, SCHEDULED, CONDITIONAL and EVENT requests.
+
+Model promotion enumerates every trial-component page in each polling pass. It
+rejects failed/stopped/unknown states, duplicate training components, nonterminating
+pagination, ambiguous/nonfinite metrics and unconfirmed detailed completion before
+any staging write. Running/stopping trials are polled for up to max_wait_attempts
+(default 3600), with wait_interval seconds between checks (default 1); API latency
+and retries are additional. Both settings are keyword-only on promote_winner and
+detect_experiment_winner. A timeout does not stop the training job or stage a model.
+All candidate artifacts remain subject to consumer, Linux and deployment acceptance.

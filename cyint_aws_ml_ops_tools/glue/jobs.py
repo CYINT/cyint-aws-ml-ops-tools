@@ -61,6 +61,8 @@ def define_job(
     trigger_environment_name = f"{environment_prefix_name}{trigger_name}"
     glue_script_bucket_name = f"{environment_prefix_name}{glue_script_bucket_name}"
 
+    prepare_trigger_definition(job_name, trigger_type, trigger_definition)
+
     response_script = handle_script_upload(
         s3client,
         file_location,
@@ -138,44 +140,43 @@ def handle_script_upload(s3client, file_location, destination_key, glue_script_b
     return response
 
 
-def handle_trigger(
-    glueclient, job_name, trigger_name, trigger_type, trigger_definition
-):
-    """
-    Sets up a trigger in AWS Glue or updates it if it already exists.
-    """
-    new_trigger = is_new_trigger(glueclient, trigger_name)
+def prepare_trigger_definition(job_name, trigger_type, trigger_definition):
+    """Validate type-specific intent without mutating caller configuration."""
+    supported = {"ON_DEMAND", "SCHEDULED", "CONDITIONAL", "EVENT"}
+    if trigger_type not in supported:
+        raise ValueError("Unsupported Glue trigger type")
+    if not isinstance(trigger_definition, dict):
+        raise TypeError("Trigger definition must be a dictionary")
+    definition = dict(trigger_definition)
+    allowed = {"Actions", "Description", "Schedule", "Predicate", "EventBatchingCondition"}
+    if set(definition) - allowed:
+        raise ValueError("Unsupported Glue trigger definition fields")
+    for field, kind in {"Schedule": "SCHEDULED", "Predicate": "CONDITIONAL", "EventBatchingCondition": "EVENT"}.items():
+        if field in definition and trigger_type != kind:
+            raise ValueError("Trigger field does not apply to the requested type")
+        if trigger_type == kind and not definition.get(field):
+            raise ValueError("Trigger type requires a nonempty " + field)
+    definition.setdefault("Actions", [{"JobName": job_name}])
+    if not isinstance(definition["Actions"], list) or not definition["Actions"]:
+        raise ValueError("Trigger requires nonempty actions")
+    return definition
 
-    schedule = None if trigger_type != "SCHEDULED" else trigger_definition["Schedule"]
-    predicate = {} if trigger_type != "CONDITIONAL" else trigger_definition["Predicate"]
-    event_batching = (
-        {"BatchSize": 1}
-        if trigger_type != "EVENT"
-        else trigger_definition["EventBatchingCondition"]
-    )
 
-    actions = (
-        [{"JobName": job_name}]
-        if "Actions" not in trigger_definition
-        else trigger_definition["Actions"]
-    )
-    trigger_definition["Actions"] = actions
+def handle_trigger(glueclient, job_name, trigger_name, trigger_type, trigger_definition):
+    """Create/update a trigger with only its applicable, caller-approved fields."""
+    definition = prepare_trigger_definition(job_name, trigger_type, trigger_definition)
+    try:
+        existing = glueclient.get_trigger(Name=trigger_name)
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") != "EntityNotFoundException":
+            raise
+        glueclient.create_trigger(Name=trigger_name, Type=trigger_type, **definition)
+    else:
+        # UpdateTrigger cannot change type; do not silently reconfigure another kind.
+        if existing.get("Trigger", {}).get("Type") != trigger_type:
+            raise ValueError("Existing Glue trigger type does not match; explicit migration required")
+    return glueclient.update_trigger(Name=trigger_name, TriggerUpdate=definition)
 
-    if new_trigger:
-        response = glueclient.create_trigger(
-            Name=trigger_name,
-            Type=trigger_type,
-            Actions=[{"JobName": job_name}],
-            Schedule=schedule,
-            Predicate=predicate,
-            EventBatchingCondition=event_batching,
-        )
-
-    response = glueclient.update_trigger(
-        Name=trigger_name, TriggerUpdate=trigger_definition
-    )
-
-    return response
 
 
 def is_new_job(glueclient, name):
