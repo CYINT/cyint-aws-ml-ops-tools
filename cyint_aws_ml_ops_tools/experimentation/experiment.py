@@ -6,10 +6,7 @@ from uuid import uuid4
 
 import boto3
 import sagemaker
-from smexperiments.experiment import Experiment
-from smexperiments.tracker import Tracker
-from smexperiments.trial import Trial
-from smexperiments.trial_component import TrialComponent
+from ._tracking import create_experiment, create_trial, ParameterTracker
 
 from ..universal.pipeline import (
     create_s3bucket_if_not_exist,
@@ -67,14 +64,9 @@ def define_experiment(
     s3client = sess.client("s3")
 
     hyperparameter_set = define_hyperparameter_set(hyperparam_configuration)
-    s3client.create_bucket(Bucket=experiment_bucket_name)
+    create_s3bucket_if_not_exist(experiment_bucket_name, s3client)
 
-    try:
-        s3client.create_bucket(Bucket=experiment_bucket_name)
-    except ClientError as e:
-        pass
-
-    training_experiment = Experiment.create(
+    training_experiment = create_experiment(
         experiment_name=experiment_name,
         description=hypothesis,
         sagemaker_boto_client=sm,
@@ -249,7 +241,7 @@ def track_experiment_metadata(
     hyperparam_configuration,
     sm,
 ):
-    with Tracker.create(
+    with ParameterTracker(
         display_name=training_experiment.experiment_name,
         artifact_bucket=experiment_bucket,
         artifact_prefix=f"{name}/{run_id}",
@@ -291,7 +283,7 @@ def create_trials(
             job_name = f"{environment_prefix_name.replace('_','-')}-{name.replace('_','-')}-{str(run_id)[:8]}{hyp_append}-{time_append}"
 
             # Create a Tracker to track Trial specific hyperparameters
-            with Tracker.create(
+            with ParameterTracker(
                 display_name=f"trial-metadata-{time_append}",
                 artifact_bucket=experiment_bucket,
                 artifact_prefix=f"{name}/{run_id}",
@@ -300,7 +292,7 @@ def create_trials(
                 trial_tracker.log_parameters(hyperparams)
 
             # Create a new Trial and associate Tracker to it
-            tf_trial = Trial.create(
+            tf_trial = create_trial(
                 trial_name=f"trial{hyp_append}-{time_append}",
                 experiment_name=training_experiment.experiment_name,
                 sagemaker_boto_client=sm,

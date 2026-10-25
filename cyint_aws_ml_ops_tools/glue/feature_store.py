@@ -22,11 +22,16 @@ def define_feature_group(
     role=None,
     data_lake_bucket=None,
     environment_prefix=None,
+    *,
+    allow_recreate=False,
 ):
     """
     Primary function to call when defining a new feature group in a Jupyter notebook or script. This function is designed to succeed regardless of
     existing state of the system.
     """
+    if type(allow_recreate) is not bool:
+        raise TypeError("allow_recreate must be an explicit boolean")
+
     environment_prefix_name = environment_prefix
 
     aws_access_key_id = (
@@ -93,6 +98,11 @@ def define_feature_group(
         )
 
     if is_different:
+        if not allow_recreate:
+            raise ValueError(
+                "Feature group differs; explicit allow_recreate=True is required "
+                "after reviewing data retention and recovery."
+            )
         sagemakerclient.delete_feature_group(FeatureGroupName=feature_group_name)
         sleep(10)
 
@@ -125,7 +135,9 @@ def is_feature_group_new(sagemakerclient, feature_group_name):
         )
         return False
     except ClientError as e:
-        return True
+        if e.response.get("Error", {}).get("Code") in {"ResourceNotFound", "ResourceNotFoundException"}:
+            return True
+        raise
 
 
 def is_feature_group_different(

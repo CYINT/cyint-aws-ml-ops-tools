@@ -31,10 +31,15 @@ def prepare_pipeline_variables(
 
 
 def create_s3bucket_if_not_exist(bucket_name, s3client):
+    request = {"Bucket": bucket_name}
+    region = s3client.meta.region_name
+    if region and region != "us-east-1":
+        request["CreateBucketConfiguration"] = {"LocationConstraint": region}
     try:
-        s3client.create_bucket(Bucket=bucket_name)
+        s3client.create_bucket(**request)
     except ClientError as e:
-        pass
+        if e.response.get("Error", {}).get("Code") != "BucketAlreadyOwnedByYou":
+            raise
 
 
 def sanitize_bucket_name(bucket_name):

@@ -192,7 +192,9 @@ def is_new_job(glueclient, name):
 
         return False
     except ClientError as e:
-        return True
+        if e.response.get("Error", {}).get("Code") == "EntityNotFoundException":
+            return True
+        raise
 
 
 def is_new_trigger(glueclient, name):
@@ -204,4 +206,6 @@ def is_new_trigger(glueclient, name):
 
         return False
     except ClientError as e:
-        return True
+        if e.response.get("Error", {}).get("Code") == "EntityNotFoundException":
+            return True
+        raise
