@@ -117,3 +117,12 @@ any staging write. Running/stopping trials are polled for up to max_wait_attempt
 and retries are additional. Both settings are keyword-only on promote_winner and
 detect_experiment_winner. A timeout does not stop the training job or stage a model.
 All candidate artifacts remain subject to consumer, Linux and deployment acceptance.
+
+
+The public Glue job entrypoint validates complete create/update job and trigger
+payloads against the installed botocore request schemas, then reads current job and
+trigger state and checks trigger compatibility before its first S3/job/trigger write.
+Unknown or denied state lookups and structurally invalid nested configuration stop
+before mutation. Job configuration is copied rather than modified in place.
+This preflight does not make multi-service operations atomic: later provider I/O
+failures can leave partial changes, so callers must reconcile state before retrying.

@@ -1,7 +1,11 @@
 import os
+from copy import deepcopy
+from functools import lru_cache
 
 import boto3
 from botocore.exceptions import ClientError
+from botocore.session import get_session
+from botocore.validate import validate_parameters
 
 from cyint_aws_ml_ops_tools.universal.pipeline import create_s3bucket_if_not_exist, resolve_aws_credentials
 
@@ -61,67 +65,60 @@ def define_job(
     trigger_environment_name = f"{environment_prefix_name}{trigger_name}"
     glue_script_bucket_name = f"{environment_prefix_name}{glue_script_bucket_name}"
 
-    prepare_trigger_definition(job_name, trigger_type, trigger_definition)
+    # Pure request validation and current-state reads precede every cloud write.
+    job_requests = prepare_job_requests(
+        job_name, command, destination_key, role_arn, python_version, job_configuration,
+    )
+    trigger_requests = prepare_trigger_requests(
+        job_name, trigger_environment_name, trigger_type, trigger_definition,
+    )
+    new_job = is_new_job(glueclient, job_name)
+    new_trigger = read_trigger_state(glueclient, trigger_environment_name, trigger_type)
 
     response_script = handle_script_upload(
-        s3client,
-        file_location,
-        destination_key,
-        glue_script_bucket_name,
+        s3client, file_location, destination_key, glue_script_bucket_name,
     )
-
-    new_job = is_new_job(glueclient, job_name)
-    response_job = handle_job(
-        glueclient,
-        new_job,
-        job_name,
-        command,
-        destination_key,
-        role_arn,
-        python_version,
-        job_configuration,
-    )
-    response_trigger = handle_trigger(
-        glueclient, job_name, trigger_environment_name, trigger_type, trigger_definition
-    )
+    response_job = apply_job_requests(glueclient, new_job, job_requests)
+    response_trigger = apply_trigger_requests(glueclient, new_trigger, trigger_requests)
     return {"job": response_job, "script": response_script, "trigger": response_trigger}
 
 
-def handle_job(
-    glueclient,
-    new_job,
-    name,
-    command,
-    destination_key,
-    role_arn,
-    python_version,
-    job_configuration={},
-):
-    """
-    Sets up the job in AWS Glue or updates it if it already exists.
-    """
+@lru_cache(maxsize=1)
+def glue_service_model():
+    # Load the installed SDK request schema as data; no client/credentials/network.
+    return get_session().get_service_model("glue")
 
-    command_object = {
-        "Name": command,
-        "ScriptLocation": destination_key,
-        "PythonVersion": python_version,
-    }
 
+def validate_glue_request(operation, request):
+    validate_parameters(request, glue_service_model().operation_model(operation).input_shape)
+
+
+def prepare_job_requests(name, command, destination_key, role_arn, python_version, job_configuration):
+    if not isinstance(job_configuration, dict):
+        raise TypeError("Job configuration must be a dictionary")
+    command_object = {"Name": command, "ScriptLocation": destination_key, "PythonVersion": python_version}
+    configuration = deepcopy(job_configuration)
+    configuration["Command"] = command_object
+    configuration.setdefault("Role", role_arn)
+    create = {"Name": name, "Role": role_arn, "Command": command_object}
+    update = {"JobName": name, "JobUpdate": configuration}
+    validate_glue_request("CreateJob", create)
+    validate_glue_request("UpdateJob", update)
+    return create, update
+
+
+def apply_job_requests(glueclient, new_job, requests):
+    create, update = requests
     if new_job:
-        response = glueclient.create_job(
-            Name=name,
-            Role=role_arn,
-            Command=command_object,
-        )
+        glueclient.create_job(**create)
+    return glueclient.update_job(**update)
 
-    job_configuration["Command"] = command_object
-    job_configuration["Role"] = (
-        role_arn if "Role" not in job_configuration else job_configuration["Role"]
-    )
 
-    response = glueclient.update_job(JobName=name, JobUpdate=job_configuration)
+def handle_job(glueclient, new_job, name, command, destination_key, role_arn, python_version, job_configuration={}):
+    """Validate both requests before creating/updating a Glue job."""
+    requests = prepare_job_requests(name, command, destination_key, role_arn, python_version, job_configuration)
+    return apply_job_requests(glueclient, new_job, requests)
 
-    return response
 
 
 def handle_script_upload(s3client, file_location, destination_key, glue_script_bucket):
@@ -147,7 +144,7 @@ def prepare_trigger_definition(job_name, trigger_type, trigger_definition):
         raise ValueError("Unsupported Glue trigger type")
     if not isinstance(trigger_definition, dict):
         raise TypeError("Trigger definition must be a dictionary")
-    definition = dict(trigger_definition)
+    definition = deepcopy(trigger_definition)
     allowed = {"Actions", "Description", "Schedule", "Predicate", "EventBatchingCondition"}
     if set(definition) - allowed:
         raise ValueError("Unsupported Glue trigger definition fields")
@@ -162,20 +159,39 @@ def prepare_trigger_definition(job_name, trigger_type, trigger_definition):
     return definition
 
 
-def handle_trigger(glueclient, job_name, trigger_name, trigger_type, trigger_definition):
-    """Create/update a trigger with only its applicable, caller-approved fields."""
+def prepare_trigger_requests(job_name, trigger_name, trigger_type, trigger_definition):
     definition = prepare_trigger_definition(job_name, trigger_type, trigger_definition)
+    create = {"Name": trigger_name, "Type": trigger_type, **definition}
+    update = {"Name": trigger_name, "TriggerUpdate": definition}
+    validate_glue_request("CreateTrigger", create)
+    validate_glue_request("UpdateTrigger", update)
+    return create, update
+
+
+def read_trigger_state(glueclient, trigger_name, trigger_type):
     try:
         existing = glueclient.get_trigger(Name=trigger_name)
     except ClientError as error:
         if error.response.get("Error", {}).get("Code") != "EntityNotFoundException":
             raise
-        glueclient.create_trigger(Name=trigger_name, Type=trigger_type, **definition)
-    else:
-        # UpdateTrigger cannot change type; do not silently reconfigure another kind.
-        if existing.get("Trigger", {}).get("Type") != trigger_type:
-            raise ValueError("Existing Glue trigger type does not match; explicit migration required")
-    return glueclient.update_trigger(Name=trigger_name, TriggerUpdate=definition)
+        return True
+    if existing.get("Trigger", {}).get("Type") != trigger_type:
+        raise ValueError("Existing Glue trigger type does not match; explicit migration required")
+    return False
+
+
+def apply_trigger_requests(glueclient, new_trigger, requests):
+    create, update = requests
+    if new_trigger:
+        glueclient.create_trigger(**create)
+    return glueclient.update_trigger(**update)
+
+
+def handle_trigger(glueclient, job_name, trigger_name, trigger_type, trigger_definition):
+    """Validate complete requests and current trigger compatibility before writes."""
+    requests = prepare_trigger_requests(job_name, trigger_name, trigger_type, trigger_definition)
+    new_trigger = read_trigger_state(glueclient, trigger_name, trigger_type)
+    return apply_trigger_requests(glueclient, new_trigger, requests)
 
 
 

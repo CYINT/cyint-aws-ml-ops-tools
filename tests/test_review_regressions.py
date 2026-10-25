@@ -22,6 +22,7 @@ def error(code, operation="CreateBucket"):
 def test_script_bucket_failure_prevents_upload_and_job_mutation(mocker, code):
     s3 = boto3.client("s3", region_name="us-west-2")
     glue = mocker.Mock()
+    glue.get_trigger.return_value = {"Trigger": {"Type": "ON_DEMAND"}}
     upload = mocker.patch.object(s3, "upload_file")
     mocker.patch.object(jobs.boto3, "client", side_effect=[glue, s3])
     with Stubber(s3) as stub:
@@ -35,7 +36,10 @@ def test_script_bucket_failure_prevents_upload_and_job_mutation(mocker, code):
                             role="qualification", glue_script_bucket="scripts", environment_prefix="qualification-")
         stub.assert_no_pending_responses()
     upload.assert_not_called()
-    assert glue.mock_calls == []
+    glue.create_job.assert_not_called()
+    glue.update_job.assert_not_called()
+    glue.create_trigger.assert_not_called()
+    glue.update_trigger.assert_not_called()
 
 
 @pytest.mark.parametrize("region,existing", [("us-east-1", False), ("us-west-2", False), ("us-west-2", True)])
