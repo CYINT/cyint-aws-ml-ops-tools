@@ -22,7 +22,7 @@ def error(code, operation="CreateBucket"):
 def test_script_bucket_failure_prevents_upload_and_job_mutation(mocker, code):
     s3 = boto3.client("s3", region_name="us-west-2")
     glue = mocker.Mock()
-    glue.get_trigger.return_value = {"Trigger": {"Type": "ON_DEMAND"}}
+    glue.get_trigger.return_value = {"Trigger": {"Type": "ON_DEMAND", "State": "CREATED"}}
     upload = mocker.patch.object(s3, "upload_file")
     mocker.patch.object(jobs.boto3, "client", side_effect=[glue, s3])
     with Stubber(s3) as stub:

@@ -201,6 +201,10 @@ def read_trigger_state(glueclient, trigger_name, trigger_type):
         return True
     if existing.get("Trigger", {}).get("Type") != trigger_type:
         raise ValueError("Existing Glue trigger type does not match; explicit migration required")
+    state = existing["Trigger"].get("State")
+    stable = {"CREATED"} if trigger_type == "ON_DEMAND" else {"CREATED", "ACTIVATED", "DEACTIVATED"}
+    if not isinstance(state, str) or state not in stable:
+        raise RuntimeError("Existing Glue trigger is not in a confirmed stable state; reconcile lifecycle before changes")
     return False
 
 

@@ -171,3 +171,9 @@ silently stripping tabs or line breaks.
 An enabled InMemory feature store rejects offline-store configuration and custom
 KMS keys before any client or write. Standard-tier offline/custom-key configuration
 remains supported. See the AWS Feature Store online-store storage documentation.
+
+Existing Glue triggers must have a confirmed stable state before script/job/trigger
+changes: CREATED for on-demand triggers; CREATED, ACTIVATED or DEACTIVATED for other
+recognized trigger types. Transitional, missing, unknown and type-incompatible
+states refuse ordinary reconciliation. The public job and direct trigger helper
+share this gate; a later provider race still requires state reconciliation.

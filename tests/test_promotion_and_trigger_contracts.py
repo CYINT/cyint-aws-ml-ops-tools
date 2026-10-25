@@ -26,7 +26,7 @@ def test_real_glue_trigger_requests_preserve_custom_actions_and_only_applicable_
     original = deepcopy(supplied)
     with Stubber(client) as stub:
         if existing:
-            stub.add_response("get_trigger", {"Trigger": {"Type": kind}}, {"Name": "qualification-trigger"})
+            stub.add_response("get_trigger", {"Trigger": {"Type": kind, "State": "CREATED"}}, {"Name": "qualification-trigger"})
         else:
             stub.add_client_error("get_trigger", "EntityNotFoundException", expected_params={"Name": "qualification-trigger"})
             stub.add_response("create_trigger", {}, {"Name": "qualification-trigger", "Type": kind, **original})
@@ -62,7 +62,7 @@ def test_invalid_trigger_intent_stops_before_upload_or_job_mutation(mocker, kind
 
 def test_existing_trigger_type_mismatch_never_updates(mocker):
     client = mocker.Mock()
-    client.get_trigger.return_value = {"Trigger": {"Type": "SCHEDULED"}}
+    client.get_trigger.return_value = {"Trigger": {"Type": "SCHEDULED", "State": "CREATED"}}
     with pytest.raises(ValueError, match="explicit migration"):
         jobs.handle_trigger(client, "job", "trigger", "ON_DEMAND", {})
     client.update_trigger.assert_not_called()

@@ -19,7 +19,7 @@ def arguments(**overrides):
 
 def clients(mocker):
     glue, s3 = mocker.Mock(), mocker.Mock()
-    glue.get_trigger.return_value = {"Trigger": {"Type": "ON_DEMAND"}}
+    glue.get_trigger.return_value = {"Trigger": {"Type": "ON_DEMAND", "State": "CREATED"}}
     mocker.patch.object(jobs.boto3, "client", side_effect=[glue, s3])
     return glue, s3
 
@@ -32,7 +32,7 @@ def assert_no_writes(glue, s3):
 
 def test_public_trigger_conflict_stops_before_bucket_script_and_job_writes(mocker):
     glue, s3 = clients(mocker)
-    glue.get_trigger.return_value = {"Trigger": {"Type": "SCHEDULED"}}
+    glue.get_trigger.return_value = {"Trigger": {"Type": "SCHEDULED", "State": "CREATED"}}
     with pytest.raises(ValueError, match="explicit migration"):
         jobs.define_job(**arguments())
     glue.get_trigger.assert_called_once_with(Name="qualification-trigger")

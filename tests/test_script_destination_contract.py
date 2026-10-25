@@ -9,7 +9,7 @@ from cyint_aws_ml_ops_tools.glue import jobs
 @pytest.mark.parametrize("destination,expected_key", [
     ("scripts/job.py", "scripts/job.py"),
     ("scripts/job with spaces.py", "scripts/job with spaces.py"),
-    ("scripts/æ—¥æœ¬èªž.py", "scripts/æ—¥æœ¬èªž.py"),
+    ("scripts/Ã¦â€”Â¥Ã¦Å“Â¬Ã¨ÂªÅ¾.py", "scripts/Ã¦â€”Â¥Ã¦Å“Â¬Ã¨ÂªÅ¾.py"),
     ("scripts/a?#%.py", "scripts/a?#%.py"),
     ("s3://qualification-scripts/scripts/job.py", "scripts/job.py"),
     ("s3://qualification-scripts/scripts/job%20with%20spaces.py", "scripts/job with spaces.py"),
@@ -23,7 +23,7 @@ from cyint_aws_ml_ops_tools.glue import jobs
 ])
 def test_public_job_binds_uploaded_key_and_canonical_script_uri(mocker, destination, expected_key):
     glue, s3 = mocker.Mock(), mocker.Mock()
-    glue.get_trigger.return_value = {"Trigger": {"Type": "ON_DEMAND"}}
+    glue.get_trigger.return_value = {"Trigger": {"Type": "ON_DEMAND", "State": "CREATED"}}
     s3.meta.region_name = "us-east-1"
     mocker.patch.object(jobs.boto3, "client", side_effect=[glue, s3])
     jobs.define_job("job", "glueetl", "script.py", destination, "trigger", "ON_DEMAND",
