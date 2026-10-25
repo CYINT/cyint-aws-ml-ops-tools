@@ -1,42 +1,28 @@
 version: 0.2
 
 env:
-  secrets-manager:
-    ENVIRONMENT_CONFIG: "overridden_by_pull_request_lambda" #See ml-aws-pipeline-builder for overriden values
+  variables:
+    PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
 
 phases:
   install:
     runtime-versions:
-      python: 3.9
+      python: 3.12
     commands:
-      - echo Entering install phase...
-      - python3 -m venv /root/venv
-      - . /root/venv/bin/activate
-      - pip3 install pytest && pip3 install poetry
-      - poetry install
-      - echo $ENVIRONMENT_CONFIG > .env
-      - export  $(cat .env | xargs)
-  pre_build:
-    commands:
-      - echo Nothing to do in the pre_build phase...
+      - python -c "import sys; assert (3, 12, 15) <= sys.version_info[:3] < (3, 13), 'Python 3.12.15 or newer in the 3.12 series is required'"
+      - python -m venv .ci-tool
+      - '.ci-tool/bin/python -m pip install --only-binary=:all: poetry==2.5.1'
+      - env -u VIRTUAL_ENV POETRY_VIRTUALENVS_CREATE=true POETRY_VIRTUALENVS_IN_PROJECT=true POETRY_KEYRING_ENABLED=false .ci-tool/bin/python -m poetry --no-plugins check --lock
+      - env -u VIRTUAL_ENV POETRY_VIRTUALENVS_CREATE=true POETRY_VIRTUALENVS_IN_PROJECT=true POETRY_KEYRING_ENABLED=false .ci-tool/bin/python -m poetry --no-plugins sync --with dev --no-interaction
   build:
     commands:
-      - echo Build started on `date`
-      - echo Running pre-commit hooks
-      - pre-commit run --all-files
-      - runipy pipeline.ipynb
-      - echo Running tests...
-      - python -m pytest --cov-report term --cov-report xml --cov=jobscripts
-  post_build:
-    commands:
-      - echo Build completed on `date`
-cache:
-  paths:
-    - '/root/venv/**/*'
-    - '/root/.cache/pip/**/*'
-    - '/root/.cache/pypoetry/virtualenvs/**/*'
+      - env -u VIRTUAL_ENV POETRY_VIRTUALENVS_CREATE=true POETRY_VIRTUALENVS_IN_PROJECT=true .ci-tool/bin/python -m poetry --no-plugins run python -m pytest -p pytest_mock -p pytest_cov --junitxml=pytest-results.xml --cov=cyint_aws_ml_ops_tools --cov-report=term --cov-report=xml
 reports:
-  pytest_reports:
+  unit_tests:
+    files:
+      - pytest-results.xml
+    file-format: JUNITXML
+  coverage:
     files:
       - coverage.xml
     file-format: COBERTURAXML

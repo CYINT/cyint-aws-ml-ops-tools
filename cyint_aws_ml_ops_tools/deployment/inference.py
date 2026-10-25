@@ -57,7 +57,7 @@ def define_inference_endpoint(
     role_arn = os.environ["DEPLOYMENT_ROLE"] if role is None else role
     model_name = sanitize_bucket_name(f"{environment_prefix_name}-{name}")
     sm_model = Model(
-        image=image,
+        image_uri=image,
         model_data=f"s3://{model_name}/{artifact_filename}",
         role=role_arn,
         sagemaker_session=sm,

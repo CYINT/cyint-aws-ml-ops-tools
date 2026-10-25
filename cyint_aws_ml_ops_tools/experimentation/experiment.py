@@ -1,4 +1,5 @@
 import itertools
+import math
 import os
 import time
 from io import StringIO
@@ -6,10 +7,7 @@ from uuid import uuid4
 
 import boto3
 import sagemaker
-from smexperiments.experiment import Experiment
-from smexperiments.tracker import Tracker
-from smexperiments.trial import Trial
-from smexperiments.trial_component import TrialComponent
+from ._tracking import create_experiment, create_trial, ParameterTracker
 
 from ..universal.pipeline import (
     create_s3bucket_if_not_exist,
@@ -67,14 +65,9 @@ def define_experiment(
     s3client = sess.client("s3")
 
     hyperparameter_set = define_hyperparameter_set(hyperparam_configuration)
-    s3client.create_bucket(Bucket=experiment_bucket_name)
+    create_s3bucket_if_not_exist(experiment_bucket_name, s3client)
 
-    try:
-        s3client.create_bucket(Bucket=experiment_bucket_name)
-    except ClientError as e:
-        pass
-
-    training_experiment = Experiment.create(
+    training_experiment = create_experiment(
         experiment_name=experiment_name,
         description=hypothesis,
         sagemaker_boto_client=sm,
@@ -127,6 +120,9 @@ def promote_winner(
     environment_prefix=None,
     experiment_bucket=None,
     verbose=True,
+    *,
+    max_wait_attempts=3600,
+    wait_interval=1,
 ):
     """
     Evaluate the results of an experiment run and promote the winning model into
@@ -159,7 +155,8 @@ def promote_winner(
     s3client = sess.client("s3")
 
     winner, winning_model = detect_experiment_winner(
-        sm, experiment_name, metric, metric_value, error_metric, verbose
+        sm, experiment_name, metric, metric_value, error_metric, verbose,
+        max_wait_attempts=max_wait_attempts, wait_interval=wait_interval,
     )
 
     create_s3bucket_if_not_exist(staging_bucket_name, s3client)
@@ -177,63 +174,71 @@ def promote_winner(
 
 
 def detect_experiment_winner(
-    sm, experiment_name, metric, metric_value, error_metric, verbose=True
+    sm, experiment_name, metric, metric_value, error_metric, verbose=True,
+    *, max_wait_attempts=3600, wait_interval=1,
 ):
-    inprogress_jobs = ["placeholder"]
-    while len(inprogress_jobs) > 0:
-        components = sm.list_trial_components(ExperimentName=experiment_name)
-
-        training_jobs = list(
-            filter(
-                lambda x: "aws-training-job" in x["TrialComponentName"],
-                components["TrialComponentSummaries"],
-            )
-        )
-        if len(training_jobs) < 1:
-            raise Exception("No training jobs found in this experiment.")
-
-        inprogress_jobs = list(
-            filter(
-                lambda x: x["Status"]["PrimaryStatus"] == "InProgress", training_jobs
-            )
-        )
+    """Rank only a fully enumerated, successfully completed experiment."""
+    if type(max_wait_attempts) is not int or max_wait_attempts < 1:
+        raise ValueError("max_wait_attempts must be a positive integer")
+    if not isinstance(wait_interval, (int, float)) or not math.isfinite(wait_interval) or wait_interval < 0:
+        raise ValueError("wait_interval must be finite and nonnegative")
+    for attempt in range(max_wait_attempts):
+        summaries = []
+        token = None
+        seen = set()
+        while True:
+            request = {"ExperimentName": experiment_name}
+            if token is not None:
+                request["NextToken"] = token
+            response = sm.list_trial_components(**request)
+            summaries.extend(response["TrialComponentSummaries"])
+            token = response.get("NextToken")
+            if not token:
+                break
+            if not isinstance(token, str) or token in seen or len(seen) >= 1000:
+                raise RuntimeError("Trial component pagination did not complete")
+            seen.add(token)
+        training_jobs = [job for job in summaries if "aws-training-job" in job["TrialComponentName"]]
+        if not training_jobs:
+            raise ValueError("No training jobs found in this experiment")
+        names = [job["TrialComponentName"] for job in training_jobs]
+        if len(names) != len(set(names)):
+            raise RuntimeError("Trial component enumeration returned duplicate training jobs")
+        states = [job.get("Status", {}).get("PrimaryStatus") for job in training_jobs]
+        if any(state not in {"Completed", "InProgress", "Stopping"} for state in states):
+            raise ValueError("Experiment contains failed, stopped or unknown training states")
+        if all(state == "Completed" for state in states):
+            break
+        if attempt + 1 == max_wait_attempts:
+            raise TimeoutError("Experiment completion was not confirmed; promotion stopped")
         if verbose:
             print(".", end="")
-        time.sleep(1)
+        time.sleep(wait_interval)
     if verbose:
         print("")
-    failed_jobs = list(
-        filter(lambda x: x["Status"]["PrimaryStatus"] == "Failed", training_jobs)
-    )
-
-    if len(failed_jobs) > 0:
-        raise Exception(
-            [
-                {"trial": job["TrialComponentName"], "Reason": job["Status"]["Message"]}
-                for job in failed_jobs
-            ]
-        )
-
-    job_dictionary = {}
-    metrics = []
-
+    candidates = []
     for job in training_jobs:
-        job_details = sm.describe_trial_component(
-            TrialComponentName=job["TrialComponentName"]
-        )
-        job_dictionary[job_details["Source"]["SourceArn"]] = job_details
-        metrics.append(
-            list(filter(lambda x: metric in x["MetricName"], job_details["Metrics"]))[0]
-        )
-    metrics.sort(key=lambda x: float(x[metric_value]), reverse=error_metric)
-    winner = job_dictionary[metrics[0]["SourceArn"]]
+        details = sm.describe_trial_component(TrialComponentName=job["TrialComponentName"])
+        if details.get("Status", {}).get("PrimaryStatus") != "Completed":
+            raise ValueError("Training component completion changed or is unconfirmed")
+        matches = [entry for entry in details["Metrics"] if metric in entry["MetricName"]]
+        if len(matches) != 1:
+            raise ValueError("Winner metric must identify exactly one metric per training component")
+        value = float(matches[0][metric_value])
+        if not math.isfinite(value):
+            raise ValueError("Winner metric must be finite")
+        candidates.append((value, details))
+    candidates.sort(key=lambda item: item[0], reverse=not error_metric)
+    winner = candidates[0][1]
     winning_model = winner["OutputArtifacts"]["SageMaker.ModelArtifact"]["Value"]
-
     return [winner, winning_model]
 
 
+
 def define_hyperparameter_set(hyperparam_configuration):
-    hypnames, hypvalues = zip(*hyperparam_configuration.items())
+    # The Cartesian product of an empty grid is one static-only trial.
+    hypnames = tuple(hyperparam_configuration)
+    hypvalues = tuple(hyperparam_configuration.values())
     trial_hyperparameter_set = [
         dict(zip(hypnames, h)) for h in itertools.product(*hypvalues)
     ]
@@ -249,7 +254,7 @@ def track_experiment_metadata(
     hyperparam_configuration,
     sm,
 ):
-    with Tracker.create(
+    with ParameterTracker(
         display_name=training_experiment.experiment_name,
         artifact_bucket=experiment_bucket,
         artifact_prefix=f"{name}/{run_id}",
@@ -291,7 +296,7 @@ def create_trials(
             job_name = f"{environment_prefix_name.replace('_','-')}-{name.replace('_','-')}-{str(run_id)[:8]}{hyp_append}-{time_append}"
 
             # Create a Tracker to track Trial specific hyperparameters
-            with Tracker.create(
+            with ParameterTracker(
                 display_name=f"trial-metadata-{time_append}",
                 artifact_bucket=experiment_bucket,
                 artifact_prefix=f"{name}/{run_id}",
@@ -300,7 +305,7 @@ def create_trials(
                 trial_tracker.log_parameters(hyperparams)
 
             # Create a new Trial and associate Tracker to it
-            tf_trial = Trial.create(
+            tf_trial = create_trial(
                 trial_name=f"trial{hyp_append}-{time_append}",
                 experiment_name=training_experiment.experiment_name,
                 sagemaker_boto_client=sm,
