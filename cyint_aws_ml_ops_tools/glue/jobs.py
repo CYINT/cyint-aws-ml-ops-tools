@@ -3,6 +3,8 @@ import os
 import boto3
 from botocore.exceptions import ClientError
 
+from cyint_aws_ml_ops_tools.universal.pipeline import create_s3bucket_if_not_exist, resolve_aws_credentials
+
 
 def define_job(
     name,
@@ -27,13 +29,8 @@ def define_job(
     """
     environment_prefix_name = environment_prefix
 
-    aws_access_key_id = (
-        os.environ["AWS_ACCESS_KEY"] if aws_access_key is None else aws_access_key
-    )
-    aws_secret_key_id = (
-        os.environ["AWS_SECRET_KEY"] if aws_secret_key is None else aws_secret_key
-    )
-    region_name = os.environ["AWS_REGION"] if region is None else region
+    aws_access_key_id, aws_secret_key_id = resolve_aws_credentials(aws_access_key, aws_secret_key)
+    region_name = region if region is not None else os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))
     role_arn = os.environ["GLUE_ROLE"] if role is None else role
     glue_script_bucket_name = (
         os.environ["GLUE_SCRIPT_BUCKET"]
@@ -64,6 +61,13 @@ def define_job(
     trigger_environment_name = f"{environment_prefix_name}{trigger_name}"
     glue_script_bucket_name = f"{environment_prefix_name}{glue_script_bucket_name}"
 
+    response_script = handle_script_upload(
+        s3client,
+        file_location,
+        destination_key,
+        glue_script_bucket_name,
+    )
+
     new_job = is_new_job(glueclient, job_name)
     response_job = handle_job(
         glueclient,
@@ -74,12 +78,6 @@ def define_job(
         role_arn,
         python_version,
         job_configuration,
-    )
-    response_script = handle_script_upload(
-        s3client,
-        file_location,
-        destination_key,
-        glue_script_bucket_name,
     )
     response_trigger = handle_trigger(
         glueclient, job_name, trigger_environment_name, trigger_type, trigger_definition
@@ -131,10 +129,7 @@ def handle_script_upload(s3client, file_location, destination_key, glue_script_b
 
     glue_script_bucket_sanitized = glue_script_bucket.replace("_", "-")
 
-    try:
-        s3client.create_bucket(Bucket=glue_script_bucket_sanitized)
-    except ClientError as e:
-        pass
+    create_s3bucket_if_not_exist(glue_script_bucket_sanitized, s3client)
 
     response = s3client.upload_file(
         file_location, glue_script_bucket_sanitized, destination_key

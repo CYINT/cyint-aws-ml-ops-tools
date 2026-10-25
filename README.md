@@ -79,3 +79,25 @@ and structured configuration use JSON strings. Exception details are not copied
 into cloud metadata. Artifact uploads remain explicit application operations.
 Bucket creation occurs once, uses the correct regional location constraint, and
 only an already-owned-bucket response is accepted as a successful existing bucket.
+
+
+Glue script upload and feature-group bucket preparation now use the same regional,
+fail-closed helper. Script upload completes before job/trigger mutation. A bucket
+failure stops feature-group deletion; explicit recreation polls for provider
+not-found for up to 120 checks separated by 10 seconds, and stops on denial,
+deletion failure or timeout. API latency and retries add to that polling interval.
+This is not a backup or a recovery guarantee; approved recreation still deletes
+online records. Existing offline records and catalog lifecycle remain AWS behavior.
+
+Winner selection maximizes ordinary scores and minimizes error metrics. A failure
+reporting tracking completion propagates; if the tracked body also failed, the
+original body exception remains primary with a generic completion-unconfirmed note.
+
+Complete explicit credentials and the legacy AWS_ACCESS_KEY/AWS_SECRET_KEY pair
+remain supported. If neither is supplied, boto3 uses its normal credential provider
+chain, including session tokens and execution roles. Partial/empty pairs are rejected
+without mixing credential sources. Do not put credentials in notebook or .env output.
+
+The offline test audit hook denies socket/DNS, subprocess and shell execution using
+PermissionError. Standard-library metadata probes can handle this denial using native
+fallbacks; no launch is permitted and no platform or SDK prewarming is required.

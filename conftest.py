@@ -24,7 +24,7 @@ os.environ.update({
 
 def _deny_external_effects(event, args):
     if event in {"socket.connect", "socket.getaddrinfo", "subprocess.Popen", "os.system"}:
-        raise RuntimeError("Offline qualification forbids network and child processes")
+        raise PermissionError("Offline qualification forbids network and child processes")
 
 
 sys.addaudithook(_deny_external_effects)

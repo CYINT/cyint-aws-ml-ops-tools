@@ -108,8 +108,14 @@ class ParameterTracker:
         if exc_type is not None:
             # Never copy exception text, which can include credentials or data, to cloud metadata.
             status = {"PrimaryStatus": "Failed", "Message": "Tracking context failed"}
-        self._client.update_trial_component(
-            TrialComponentName=self.trial_component.trial_component_name,
-            Status=status, EndTime=datetime.now(timezone.utc), Parameters=self._parameters,
-        )
+        try:
+            self._client.update_trial_component(
+                TrialComponentName=self.trial_component.trial_component_name,
+                Status=status, EndTime=datetime.now(timezone.utc), Parameters=self._parameters,
+            )
+        except Exception:
+            if exc_value is None:
+                raise
+            # Preserve the body failure without disclosing either exception to cloud metadata.
+            exc_value.add_note("Tracking status update also failed; remote completion is unconfirmed")
         return False

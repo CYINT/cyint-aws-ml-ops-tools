@@ -217,7 +217,7 @@ def detect_experiment_winner(
         metrics.append(
             list(filter(lambda x: metric in x["MetricName"], job_details["Metrics"]))[0]
         )
-    metrics.sort(key=lambda x: float(x[metric_value]), reverse=error_metric)
+    metrics.sort(key=lambda x: float(x[metric_value]), reverse=not error_metric)
     winner = job_dictionary[metrics[0]["SourceArn"]]
     winning_model = winner["OutputArtifacts"]["SageMaker.ModelArtifact"]["Value"]
 

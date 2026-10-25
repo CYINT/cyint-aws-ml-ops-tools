@@ -3,6 +3,25 @@ import os
 from botocore.exceptions import ClientError
 
 
+
+def resolve_aws_credentials(aws_access_key=None, aws_secret_key=None):
+    """Keep complete explicit/legacy pairs; otherwise use the SDK provider chain.
+
+    Incomplete pairs are errors, never silently combined across credential sources.
+    Return None values so boto3 can use standard environment/session-token, role,
+    web-identity or configured provider credentials without generating a .env file.
+    """
+    if aws_access_key is not None or aws_secret_key is not None:
+        key, secret = aws_access_key, aws_secret_key
+    else:
+        key, secret = os.environ.get("AWS_ACCESS_KEY"), os.environ.get("AWS_SECRET_KEY")
+    if key is None and secret is None:
+        return None, None
+    if not isinstance(key, str) or not key or not isinstance(secret, str) or not secret:
+        raise ValueError("AWS credentials require a complete nonempty key/secret pair")
+    return key, secret
+
+
 def prepare_pipeline_variables(
     environment_prefix=None, aws_access_key=None, aws_secret_key=None, region=None
 ):
@@ -13,13 +32,8 @@ def prepare_pipeline_variables(
 
     environment_prefix_name = environment_prefix
 
-    aws_access_key_id = (
-        os.environ["AWS_ACCESS_KEY"] if aws_access_key is None else aws_access_key
-    )
-    aws_secret_key_id = (
-        os.environ["AWS_SECRET_KEY"] if aws_secret_key is None else aws_secret_key
-    )
-    region_name = os.environ["AWS_REGION"] if region is None else region
+    aws_access_key_id, aws_secret_key_id = resolve_aws_credentials(aws_access_key, aws_secret_key)
+    region_name = region if region is not None else os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))
 
     environment_prefix_name = (
         os.environ["ENVIRONMENT_PREFIX"]

@@ -1,6 +1,7 @@
 """Real SDK imports and offline public API safety contracts."""
 import importlib
 import socket
+from types import SimpleNamespace
 
 import pytest
 from sagemaker.feature_store.feature_group import FeatureGroup
@@ -56,6 +57,7 @@ def _definition():
 def _changed_group(mocker):
     sm = mocker.Mock()
     s3 = mocker.Mock()
+    s3.meta = SimpleNamespace(region_name="us-east-1")
     mocker.patch.object(feature_store.boto3, "client", side_effect=[sm, s3])
     mocker.patch.object(feature_store, "is_feature_group_new", return_value=False)
     mocker.patch.object(feature_store, "is_feature_group_different", return_value=True)
@@ -73,11 +75,11 @@ def test_changed_group_refuses_deletion_without_explicit_opt_in(mocker):
 
 def test_explicit_opt_in_preserves_recreate_contract(mocker):
     sm, s3 = _changed_group(mocker)
-    pause = mocker.patch.object(feature_store, "sleep")
+    wait = mocker.patch.object(feature_store, "wait_for_feature_group_deletion")
     result = feature_store.define_feature_group(**_definition(), allow_recreate=True)
     sm.delete_feature_group.assert_called_once_with(FeatureGroupName="qualification-features")
     sm.create_feature_group.assert_called_once()
-    pause.assert_called_once_with(10)
+    wait.assert_called_once_with(sm, "qualification-features")
     assert result == {"feature_group": sm.create_feature_group.return_value}
 
 
@@ -90,7 +92,7 @@ def test_recreate_opt_in_rejects_ambiguous_values_before_client_access(mocker, v
 
 
 def test_qualification_network_boundary_blocks_before_connect():
-    with pytest.raises(RuntimeError, match="Offline qualification"):
+    with pytest.raises(PermissionError, match="Offline qualification"):
         socket.create_connection(("127.0.0.1", 9), timeout=0.01)
 
 

@@ -1,9 +1,11 @@
+from types import SimpleNamespace
 from botocore.exceptions import ClientError
 from cyint_aws_ml_ops_tools.glue.feature_store import define_feature_group
 
 
 def test_feature_store_creates_new_group_without_deleting(mocker):
     sm, s3 = mocker.Mock(), mocker.Mock()
+    s3.meta = SimpleNamespace(region_name="us-east-1")
     sm.describe_feature_group.side_effect = ClientError(
         {"Error": {"Code": "ResourceNotFound", "Message": "qualification"}}, "DescribeFeatureGroup"
     )

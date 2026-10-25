@@ -6,6 +6,8 @@ from botocore.exceptions import ClientError
 from sagemaker.feature_store.feature_group import FeatureGroup
 from sagemaker.session import Session
 
+from cyint_aws_ml_ops_tools.universal.pipeline import create_s3bucket_if_not_exist, resolve_aws_credentials
+
 
 def define_feature_group(
     name,
@@ -34,12 +36,7 @@ def define_feature_group(
 
     environment_prefix_name = environment_prefix
 
-    aws_access_key_id = (
-        os.environ["AWS_ACCESS_KEY"] if aws_access_key is None else aws_access_key
-    )
-    aws_secret_key_id = (
-        os.environ["AWS_SECRET_KEY"] if aws_secret_key is None else aws_secret_key
-    )
+    aws_access_key_id, aws_secret_key_id = resolve_aws_credentials(aws_access_key, aws_secret_key)
 
     environment_prefix_name = (
         os.environ["ENVIRONMENT_PREFIX"]
@@ -53,7 +50,7 @@ def define_feature_group(
     data_lake_bucket_name = f"{environment_prefix_name}{data_lake_bucket_name}"
     data_lake_bucket_name = data_lake_bucket_name.replace("_", "-")
 
-    region_name = os.environ["AWS_REGION"] if region is None else region
+    region_name = region if region is not None else os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))
     role_arn = os.environ["SAGEMAKER_ROLE"] if role is None else role
 
     offline_store_config_object = (
@@ -103,15 +100,14 @@ def define_feature_group(
                 "Feature group differs; explicit allow_recreate=True is required "
                 "after reviewing data retention and recovery."
             )
+    # Validate storage before the explicit destructive operation, or any creation.
+    create_s3bucket_if_not_exist(data_lake_bucket_name, s3client)
+
+    if is_different:
         sagemakerclient.delete_feature_group(FeatureGroupName=feature_group_name)
-        sleep(10)
+        wait_for_feature_group_deletion(sagemakerclient, feature_group_name)
 
     response = {"Message": "Feature group already exists with the provided definition."}
-
-    try:
-        s3client.create_bucket(Bucket=data_lake_bucket_name)
-    except ClientError as e:
-        pass
 
     if is_different or is_new:
         response = sagemakerclient.create_feature_group(
@@ -126,6 +122,23 @@ def define_feature_group(
         )
 
     return {"feature_group": response}
+
+
+
+def wait_for_feature_group_deletion(sagemakerclient, feature_group_name, *, attempts=120, delay=10):
+    """Poll up to 120 checks; only provider not-found proves deletion."""
+    for attempt in range(attempts):
+        try:
+            response = sagemakerclient.describe_feature_group(FeatureGroupName=feature_group_name)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in {"ResourceNotFound", "ResourceNotFoundException"}:
+                return
+            raise
+        if response.get("FeatureGroupStatus") == "DeleteFailed":
+            raise RuntimeError("Feature group deletion failed; recreation stopped")
+        if attempt + 1 < attempts:
+            sleep(delay)
+    raise TimeoutError("Feature group deletion was not confirmed; recreation stopped")
 
 
 def is_feature_group_new(sagemakerclient, feature_group_name):
@@ -212,12 +225,7 @@ def load_feature_group(
     """
     environment_prefix_name = environment_prefix
 
-    aws_access_key_id = (
-        os.environ["AWS_ACCESS_KEY"] if aws_access_key is None else aws_access_key
-    )
-    aws_secret_key_id = (
-        os.environ["AWS_SECRET_KEY"] if aws_secret_key is None else aws_secret_key
-    )
+    aws_access_key_id, aws_secret_key_id = resolve_aws_credentials(aws_access_key, aws_secret_key)
 
     environment_prefix_name = (
         os.environ["ENVIRONMENT_PREFIX"]
