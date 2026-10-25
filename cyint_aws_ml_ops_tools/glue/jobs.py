@@ -130,6 +130,9 @@ def prepare_script_destination(bucket, destination):
         raise ValueError("Script destination must be a nonempty object key or S3 URI")
     key = destination
     if destination.lower().startswith("s3://"):
+        # urlsplit removes CR/LF/TAB; reject literal URI controls before parsing.
+        if any(ord(character) < 32 or ord(character) == 127 for character in destination):
+            raise ValueError("S3 script URIs must percent-encode control characters")
         uri = urlsplit(destination)
         if uri.netloc != bucket or uri.query or uri.fragment:
             raise ValueError("S3 script URI must use the configured bucket and no query or fragment")

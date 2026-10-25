@@ -162,3 +162,8 @@ vectors. Iceberg event time must be String and Glue table creation must remain e
 A missing or empty hyperparameter grid creates one static-only parameter combination
 per dataset. Static parameters, experiment/trial/component metadata and the training
 callback are preserved; a nonempty grid still produces its Cartesian combinations.
+
+S3 script URIs reject literal ASCII control characters before URI parsing. Raw
+object keys preserve their bytes, including control characters; percent-encoded
+URI keys are decoded once and encoded in the canonical ScriptLocation without
+silently stripping tabs or line breaks.
