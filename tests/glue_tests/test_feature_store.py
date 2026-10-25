@@ -11,7 +11,7 @@ def test_feature_store_creates_new_group_without_deleting(mocker):
     )
     mocker.patch("boto3.client", side_effect=[sm, s3])
     response = define_feature_group(
-        "features", "qualification", "record", "time", [], {}, {}, None,
+        "features", "qualification", "record", "time", [{"FeatureName": "record", "FeatureType": "String"}, {"FeatureName": "time", "FeatureType": "Fractional"}], {"EnableOnlineStore": True}, {}, None,
         "testing", "testing", "us-east-1", "arn:aws:iam::123456789012:role/qualification",
         "data", "qualification-",
     )

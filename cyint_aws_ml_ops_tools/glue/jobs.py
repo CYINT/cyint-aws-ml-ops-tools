@@ -1,4 +1,6 @@
 import os
+import re
+from urllib.parse import quote, unquote, urlsplit
 from copy import deepcopy
 from functools import lru_cache
 
@@ -66,8 +68,9 @@ def define_job(
     glue_script_bucket_name = f"{environment_prefix_name}{glue_script_bucket_name}"
 
     # Pure request validation and current-state reads precede every cloud write.
+    _, script_location = prepare_script_destination(glue_script_bucket_name.replace("_", "-"), destination_key)
     job_requests = prepare_job_requests(
-        job_name, command, destination_key, role_arn, python_version, job_configuration,
+        job_name, command, script_location, role_arn, python_version, job_configuration,
     )
     trigger_requests = prepare_trigger_requests(
         job_name, trigger_environment_name, trigger_type, trigger_definition,
@@ -121,17 +124,36 @@ def handle_job(glueclient, new_job, name, command, destination_key, role_arn, py
 
 
 
+
+def prepare_script_destination(bucket, destination):
+    """Return one object key and its canonical URI; never silently change bucket."""
+    if not isinstance(destination, str) or not destination:
+        raise ValueError("Script destination must be a nonempty object key or S3 URI")
+    key = destination
+    if destination.lower().startswith("s3://"):
+        uri = urlsplit(destination)
+        if uri.netloc != bucket or uri.query or uri.fragment:
+            raise ValueError("S3 script URI must use the configured bucket and no query or fragment")
+        if re.search(r"%(?![0-9a-fA-F]{2})", uri.path):
+            raise ValueError("S3 script URI contains invalid percent encoding")
+        key = unquote(uri.path[1:], encoding="utf-8", errors="strict")
+    if not key or len(key.encode("utf-8")) > 1024:
+        raise ValueError("Script object key must contain 1 to 1024 UTF-8 bytes")
+    return key, "s3://" + bucket + "/" + quote(key, safe="/")
+
+
 def handle_script_upload(s3client, file_location, destination_key, glue_script_bucket):
     """
     Uploads the Glue Job script to the S3 bucket, and creates the necessary environment bucket if it doesn't exist.
     """
 
     glue_script_bucket_sanitized = glue_script_bucket.replace("_", "-")
+    object_key, _ = prepare_script_destination(glue_script_bucket_sanitized, destination_key)
 
     create_s3bucket_if_not_exist(glue_script_bucket_sanitized, s3client)
 
     response = s3client.upload_file(
-        file_location, glue_script_bucket_sanitized, destination_key
+        file_location, glue_script_bucket_sanitized, object_key
     )
 
     return response

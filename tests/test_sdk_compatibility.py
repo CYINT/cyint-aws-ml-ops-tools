@@ -47,7 +47,7 @@ def test_bucket_name_normalization():
 def _definition():
     return dict(
         name="features", description="qualification", record_identifier_feature="record",
-        event_time_feature="time", feature_definitions=[], online_store_config={"EnableOnlineStore": True},
+        event_time_feature="time", feature_definitions=[{"FeatureName": "record", "FeatureType": "String"}, {"FeatureName": "time", "FeatureType": "Fractional"}], online_store_config={"EnableOnlineStore": True},
         offline_store_config={}, aws_access_key="testing", aws_secret_key="testing", region="us-east-1",
         role="arn:aws:iam::123456789012:role/qualification", data_lake_bucket="data",
         environment_prefix="qualification-",

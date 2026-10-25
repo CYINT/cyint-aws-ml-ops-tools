@@ -95,7 +95,7 @@ def test_real_sdk_full_public_sequence_reads_before_writes_and_preserves_configu
     mocker.patch.object(jobs.boto3, "client", side_effect=[glue, s3])
     configuration = {"DefaultArguments": {"--qualification": "true"}, "MaxRetries": 1}
     original = deepcopy(configuration)
-    command = {"Name": "glueetl", "ScriptLocation": "script.py", "PythonVersion": "3"}
+    command = {"Name": "glueetl", "ScriptLocation": "s3://qualification-scripts/script.py", "PythonVersion": "3"}
     action = [{"JobName": "qualification-job"}]
     with Stubber(glue) as g, Stubber(s3) as storage:
         g.add_client_error("get_job", "EntityNotFoundException", expected_params={"JobName": "qualification-job"})

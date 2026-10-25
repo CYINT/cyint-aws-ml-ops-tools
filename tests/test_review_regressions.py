@@ -61,8 +61,8 @@ def test_script_upload_uses_regional_request_and_preserves_destination(mocker, r
 
 def definition():
     return dict(name="features", description="qualification", record_identifier_feature="record",
-                event_time_feature="time", feature_definitions=[], online_store_config={}, offline_store_config={},
-                aws_access_key="testing", aws_secret_key="testing", region="us-west-2", role="qualification",
+                event_time_feature="time", feature_definitions=[{"FeatureName": "record", "FeatureType": "String"}, {"FeatureName": "time", "FeatureType": "Fractional"}], online_store_config={"EnableOnlineStore": True}, offline_store_config={},
+                aws_access_key="testing", aws_secret_key="testing", region="us-west-2", role="arn:aws:iam::123456789012:role/qualification",
                 data_lake_bucket="data", environment_prefix="qualification-")
 
 

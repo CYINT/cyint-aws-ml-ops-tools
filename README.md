@@ -126,3 +126,23 @@ Unknown or denied state lookups and structurally invalid nested configuration st
 before mutation. Job configuration is copied rather than modified in place.
 This preflight does not make multi-service operations atomic: later provider I/O
 failures can leave partial changes, so callers must reconcile state before retrying.
+
+
+Feature-group creation/replacement prepares an independent deep copy and validates
+its complete SDK request before clients, bucket creation or deletion. Enum/pattern,
+feature-name/identifier/event-time and known store-configuration constraints are
+checked locally. Online-store defaults remain enabled; an empty offline config is
+omitted. Neither input dictionaries nor shared defaults are changed. Prefix overrides
+retain an explicitly supplied offline KMS key. Comparison reads every feature page,
+rejects incomplete/unstable enumeration, and normalizes provider defaults on copies
+without injecting resolved S3/catalog fields into the create request. An unchanged
+group returns without bucket or feature-group writes. Explicit recreation still
+requires reviewed data retention/recovery and confirmed absence; a later provider
+I/O failure can leave the old online store deleted. These checks are not a restore.
+
+The public Glue job binds ScriptLocation to the same bucket/key uploaded by the
+library. destination_key accepts a raw object key or an S3 URI in the configured
+script bucket; cross-bucket URIs are rejected before any write. Raw keys are retained
+for upload and encoded for the canonical script URI. S3 URI paths are decoded once;
+queries, fragments and invalid encodings are rejected rather than silently remapped.
+Direct handle_job callers continue to supply their intended existing script location.
