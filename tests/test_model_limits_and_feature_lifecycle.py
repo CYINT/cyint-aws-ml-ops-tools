@@ -172,3 +172,33 @@ def test_valid_iceberg_string_time_remains_supported():
         definitions, None, {"S3StorageConfig": {"S3Uri": "s3://qualification-data/features"}, "TableFormat": "Iceberg"},
         None, "qualification-data", ROLE)
     assert prepared["OfflineStoreConfig"]["TableFormat"] == "Iceberg"
+
+
+@pytest.mark.parametrize("online,offline", [
+    ({"EnableOnlineStore": True, "StorageType": "InMemory"},
+     {"S3StorageConfig": {"S3Uri": "s3://qualification-data/features"}}),
+    ({"EnableOnlineStore": True, "StorageType": "InMemory", "SecurityConfig": {"KmsKeyId": "alias/qualification"}}, None),
+    ({"EnableOnlineStore": True, "StorageType": "InMemory", "SecurityConfig": {"KmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/qualification"}}, None),
+])
+def test_unsupported_inmemory_configuration_stops_before_clients(mocker, online, offline):
+    factory = mocker.patch.object(feature_store.boto3, "client")
+    with pytest.raises(ValueError, match="InMemory"):
+        feature_store.define_feature_group(**arguments(online_store_config=online, offline_store_config=offline), allow_recreate=True)
+    factory.assert_not_called()
+
+
+def test_standard_online_custom_key_and_offline_store_are_preserved():
+    online = {"EnableOnlineStore": True, "StorageType": "Standard", "SecurityConfig": {"KmsKeyId": "alias/qualification"}}
+    offline = {"S3StorageConfig": {"S3Uri": "s3://qualification-data/features"}}
+    prepared = feature_store.prepare_feature_group_request("qualification-features", "qualification", "record", "time",
+        FEATURES, online, offline, None, "qualification-data", ROLE)
+    assert prepared["OnlineStoreConfig"] == online
+    assert prepared["OfflineStoreConfig"] == offline
+
+
+def test_inmemory_without_custom_key_keeps_default_security_configuration():
+    online = {"EnableOnlineStore": True, "StorageType": "InMemory", "SecurityConfig": {}}
+    prepared = feature_store.prepare_feature_group_request("qualification-features", "qualification", "record", "time",
+        FEATURES, online, None, None, "qualification-data", ROLE)
+    assert prepared["OnlineStoreConfig"] == online
+    assert "OfflineStoreConfig" not in prepared

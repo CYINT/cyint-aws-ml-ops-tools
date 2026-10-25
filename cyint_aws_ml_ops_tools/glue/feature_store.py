@@ -160,6 +160,11 @@ def prepare_feature_group_request(name, description, record_identifier, event_ti
         raise ValueError("Event-time feature must be String or Fractional")
     if not online.get("EnableOnlineStore", False) and not offline:
         raise ValueError("Enable an online or offline feature store")
+    if online.get("EnableOnlineStore", False) and online.get("StorageType") == "InMemory":
+        if offline:
+            raise ValueError("InMemory online stores do not support an offline store")
+        if online.get("SecurityConfig", {}).get("KmsKeyId"):
+            raise ValueError("InMemory online stores do not support customer-managed KMS keys")
     if offline.get("TableFormat") == "Iceberg":
         if offline.get("DisableGlueTableCreation", False):
             raise ValueError("Iceberg feature stores require Glue table creation")

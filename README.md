@@ -167,3 +167,7 @@ S3 script URIs reject literal ASCII control characters before URI parsing. Raw
 object keys preserve their bytes, including control characters; percent-encoded
 URI keys are decoded once and encoded in the canonical ScriptLocation without
 silently stripping tabs or line breaks.
+
+An enabled InMemory feature store rejects offline-store configuration and custom
+KMS keys before any client or write. Standard-tier offline/custom-key configuration
+remains supported. See the AWS Feature Store online-store storage documentation.
