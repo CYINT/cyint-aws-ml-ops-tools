@@ -194,3 +194,31 @@ def test_incomplete_or_unstable_feature_pagination_stops_before_write(mocker, fa
     factory.assert_called_once()
     sm.delete_feature_group.assert_not_called()
     sm.create_feature_group.assert_not_called()
+
+
+def test_online_only_group_without_unused_role_metadata_is_idempotent(mocker):
+    sm = boto3.client("sagemaker", region_name="us-east-1")
+    factory = mocker.patch.object(feature_store.boto3, "client", return_value=sm)
+    response = existing()
+    response.pop("RoleArn")  # Role is optional and used for the offline store.
+    with Stubber(sm) as service:
+        service.add_response("describe_feature_group", response, {"FeatureGroupName": "qualification-features"})
+        service.add_response("describe_feature_group", response, {"FeatureGroupName": "qualification-features"})
+        result = feature_store.define_feature_group(**arguments())
+        assert "already exists" in result["feature_group"]["Message"]
+        service.assert_no_pending_responses()
+    factory.assert_called_once()
+
+
+def test_missing_offline_role_is_unknown_not_permission_to_recreate(mocker):
+    sm = mocker.Mock()
+    offline = {"S3StorageConfig": {"S3Uri": "s3://qualification-data/features"}}
+    response = existing(OfflineStoreConfig=deepcopy(offline))
+    response.pop("RoleArn")
+    sm.describe_feature_group.return_value = response
+    factory = mocker.patch.object(feature_store.boto3, "client", return_value=sm)
+    with pytest.raises(RuntimeError, match="execution role is unconfirmed"):
+        feature_store.define_feature_group(**arguments(offline_store_config=offline), allow_recreate=True)
+    factory.assert_called_once()
+    sm.delete_feature_group.assert_not_called()
+    sm.create_feature_group.assert_not_called()

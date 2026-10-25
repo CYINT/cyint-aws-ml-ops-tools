@@ -244,8 +244,11 @@ def is_feature_group_different(sagemakerclient, feature_group_name, record_ident
     # AWS generates these catalog values when the caller does not specify them.
     if "DataCatalogConfig" not in desired_offline:
         actual_offline.pop("DataCatalogConfig", None)
+    has_offline_store = bool(actual_offline or desired_offline)
+    if has_offline_store and not response.get("RoleArn"):
+        raise RuntimeError("Feature-group offline execution role is unconfirmed")
     return (
-        response["RoleArn"] != role_arn
+        (has_offline_store and response.get("RoleArn") != role_arn)
         or response["RecordIdentifierFeatureName"] != record_identifier_feature
         or response["EventTimeFeatureName"] != event_time_feature
         or response["FeatureDefinitions"] != feature_definitions
